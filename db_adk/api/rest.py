@@ -44,16 +44,14 @@ class AgentResponse(BaseModel):
 
     id: int
     name: str
-    description: str
+    description: Optional[str] = None
     agent_type: str
-    prompt_template: Optional[str]
-    model_name: Optional[str]
-    configuration: Dict[str, Any]
-    created_at: str
-    updated_at: str
+    prompt_template: Optional[str] = None
+    model_name: Optional[str] = None
+    configuration: Dict[str, Any] = {}
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class ToolCreate(BaseModel):
@@ -72,16 +70,14 @@ class ToolResponse(BaseModel):
 
     id: int
     name: str
-    description: str
+    description: Optional[str] = None
     tool_type: str
     module_path: str
     function_name: str
-    parameters_schema: Dict[str, Any]
-    created_at: str
-    updated_at: str
+    parameters_schema: Dict[str, Any] = {}
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class AgentToolCreate(BaseModel):
