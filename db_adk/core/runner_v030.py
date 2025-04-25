@@ -7,7 +7,7 @@ runner functionality that matches the new API requirements.
 
 import json
 import os
-from typing import Any, Dict, Union
+from typing import Any, Dict, List, Union
 
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
@@ -61,7 +61,7 @@ def setup_runner(
 
     # Create session service and initialize session
     session_service = InMemorySessionService()
-    session = session_service.create_session(
+    session_service.create_session(
         app_name=app_name, user_id=user_id, session_id=session_id
     )
 
@@ -93,6 +93,26 @@ def create_content_message(input_data: Union[str, Dict[str, Any]]) -> types.Cont
     return types.Content(role="user", parts=[types.Part(text=query_text)])
 
 
+def extract_response_from_events(events) -> List[str]:
+    """Extract text responses from runner events.
+
+    Args:
+        events: Iterator of events from runner.run()
+
+    Returns:
+        List[str]: List of text responses extracted from events
+    """
+    responses = []
+    for event in events:
+        if event.is_final_response() and event.content is not None:
+            if hasattr(event.content, "parts") and event.content.parts:
+                for part in event.content.parts:
+                    if hasattr(part, "text") and part.text:
+                        responses.append(part.text)
+
+    return responses
+
+
 def run_agent_with_runner(
     agent_id: int,
     input_data: Union[str, Dict[str, Any]],
@@ -115,7 +135,10 @@ def run_agent_with_runner(
     # Setup API credentials first
     credential_setup = setup_api_credentials()
     if not credential_setup:
-        return "Error: Google API credentials not configured. Please set GOOGLE_API_KEY environment variable."
+        return (
+            "Error: Google API credentials not configured. "
+            "Please set GOOGLE_API_KEY environment variable."
+        )
 
     # Create agent from database record
     agent = create_agent_from_record(agent_id, db_session)
@@ -131,16 +154,8 @@ def run_agent_with_runner(
     # Run the agent using the runner
     events = runner.run(user_id=user_id, session_id=session_id, new_message=content)
 
-    # Collect responses
-    responses = []
-    for event in events:
-        if event.is_final_response() and event.content is not None:
-            if hasattr(event.content, "parts") and event.content.parts:
-                # Check if parts exists and is not empty
-                part = event.content.parts[0]
-                if hasattr(part, "text") and part.text:
-                    # Check if text attribute exists and is not empty
-                    responses.append(part.text)
+    # Extract responses using the utility function
+    responses = extract_response_from_events(events)
 
     logger.info("Agent execution completed")
 

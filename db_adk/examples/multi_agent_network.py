@@ -8,16 +8,16 @@ and specialized agents for weather information and itinerary planning.
 import json
 import os
 import sys
-import logging
+
 from sqlalchemy import create_engine
 
 # Add parent directory to path for standalone execution
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 # Import from DB-ADK package
+from db_adk.core.network_manager import run_agent_network
 from db_adk.db.connection import get_db_session
-from db_adk.db.models import Base, Agent, Tool, AgentTool, AgentRelationship
-from db_adk.core.network_manager import create_agent_network, run_agent_network
+from db_adk.db.models import Agent, AgentRelationship, AgentTool, Base, Tool
 from db_adk.utils.logging import get_logger
 
 # Initialize logger
@@ -27,10 +27,10 @@ logger = get_logger(__name__)
 # These would normally be in separate modules
 def get_weather(location: str):
     """Get weather information for a location.
-    
+
     Args:
         location (str): The location to get weather for (city, country).
-        
+
     Returns:
         dict: Weather information.
     """
@@ -45,16 +45,16 @@ def get_weather(location: str):
             {"day": "Day after", "temp": 22, "conditions": "Cloudy"}
         ]
     }
-    
+
     return weather_data
 
 def plan_travel(destination: str, days: int):
     """Plan a travel itinerary.
-    
+
     Args:
         destination (str): Travel destination.
         days (int): Number of days for the trip.
-        
+
     Returns:
         dict: Travel itinerary.
     """
@@ -64,7 +64,7 @@ def plan_travel(destination: str, days: int):
         "days": days,
         "plan": []
     }
-    
+
     # Generate a simple itinerary
     for day in range(1, days + 1):
         itinerary["plan"].append({
@@ -75,21 +75,21 @@ def plan_travel(destination: str, days: int):
                 "Evening: Cultural experience"
             ]
         })
-    
+
     return itinerary
 
 def setup_database():
     """Set up the database with example data.
-    
+
     Returns:
         int: The ID of the coordinator agent.
     """
     # Create engine and tables
     engine = create_engine("postgresql://postgres:password@localhost:5432/db_adk")
     Base.metadata.create_all(engine)
-    
+
     logger.info("Setting up database with example data")
-    
+
     with get_db_session() as session:
         # Create weather tool
         weather_tool = Tool(
@@ -110,7 +110,7 @@ def setup_database():
             }
         )
         session.add(weather_tool)
-        
+
         # Create travel planning tool
         travel_tool = Tool(
             name="plan_travel",
@@ -134,7 +134,7 @@ def setup_database():
             }
         )
         session.add(travel_tool)
-        
+
         # Create coordinator agent
         coordinator = Agent(
             name="travel_coordinator",
@@ -148,7 +148,7 @@ def setup_database():
             model_name="gemini-1.5-pro"
         )
         session.add(coordinator)
-        
+
         # Create weather agent
         weather_agent = Agent(
             name="weather_assistant",
@@ -162,7 +162,7 @@ def setup_database():
             model_name="gemini-1.5-pro"
         )
         session.add(weather_agent)
-        
+
         # Create travel planner agent
         travel_agent = Agent(
             name="travel_planner",
@@ -176,21 +176,21 @@ def setup_database():
             model_name="gemini-1.5-pro"
         )
         session.add(travel_agent)
-        
+
         # Commit to get IDs
         session.commit()
-        
+
         # Assign tools to agents
         session.add(AgentTool(
             agent_id=weather_agent.id,
             tool_id=weather_tool.id
         ))
-        
+
         session.add(AgentTool(
             agent_id=travel_agent.id,
             tool_id=travel_tool.id
         ))
-        
+
         # Set up agent relationships
         session.add(AgentRelationship(
             parent_agent_id=coordinator.id,
@@ -198,18 +198,18 @@ def setup_database():
             relationship_type="sequential",
             execution_order=1
         ))
-        
+
         session.add(AgentRelationship(
             parent_agent_id=coordinator.id,
             child_agent_id=travel_agent.id,
             relationship_type="sequential",
             execution_order=2
         ))
-        
+
         session.commit()
-        
+
         logger.info(f"Database setup complete. Coordinator agent ID: {coordinator.id}")
-        
+
         return coordinator.id
 
 def run_example():
@@ -217,26 +217,26 @@ def run_example():
     try:
         # Set up database
         coordinator_id = setup_database()
-        
+
         # Create and run the agent network
         with get_db_session() as session:
             # Prepare input data
             input_data = {
                 "query": "Plan a 3-day trip to Barcelona in June"
             }
-            
+
             logger.info(f"Running agent network with input: {input_data}")
-            
+
             # Run the network
             result = run_agent_network(coordinator_id, input_data, session)
-            
+
             # Print the result
             print("\nAgent Network Result:")
             print("====================")
             print(json.dumps(result, indent=2))
-            
+
             logger.info("Example execution completed")
-            
+
     except Exception as e:
         logger.error(f"Error running example: {str(e)}")
         print(f"Error: {str(e)}")

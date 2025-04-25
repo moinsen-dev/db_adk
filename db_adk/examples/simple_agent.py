@@ -12,16 +12,16 @@ This example shows how to:
 import json
 import os
 import sys
-import logging
+
 from sqlalchemy import create_engine
 
 # Add parent directory to path for standalone execution
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 # Import from DB-ADK package
-from db_adk.db.connection import get_db_session
-from db_adk.db.models import Base, Agent, Tool, AgentTool
 from db_adk.core.agent_factory import create_agent_from_record
+from db_adk.db.connection import get_db_session
+from db_adk.db.models import Agent, AgentTool, Base, Tool
 from db_adk.utils.logging import get_logger
 
 # Initialize logger
@@ -30,10 +30,10 @@ logger = get_logger(__name__)
 # Example tool function implementation
 def search_wiki(query: str) -> dict:
     """Search for information (mock implementation).
-    
+
     Args:
         query (str): The search query.
-        
+
     Returns:
         dict: Search results.
     """
@@ -51,16 +51,16 @@ def search_wiki(query: str) -> dict:
 
 def setup_database():
     """Set up the database with a simple agent and tool.
-    
+
     Returns:
         int: The ID of the created agent.
     """
     # Create engine and tables
     engine = create_engine("postgresql://postgres:password@localhost:5432/db_adk")
     Base.metadata.create_all(engine)
-    
+
     logger.info("Setting up database with simple agent example")
-    
+
     with get_db_session() as session:
         # Create search tool
         search_tool = Tool(
@@ -82,7 +82,7 @@ def setup_database():
         )
         session.add(search_tool)
         session.commit()
-        
+
         # Create a simple LLM agent
         agent = Agent(
             name="research_assistant",
@@ -102,16 +102,16 @@ def setup_database():
         )
         session.add(agent)
         session.commit()
-        
+
         # Assign tool to agent
         session.add(AgentTool(
             agent_id=agent.id,
             tool_id=search_tool.id
         ))
         session.commit()
-        
+
         logger.info(f"Database setup complete. Agent ID: {agent.id}")
-        
+
         return agent.id
 
 def run_example():
@@ -119,29 +119,29 @@ def run_example():
     try:
         # Set up database
         agent_id = setup_database()
-        
+
         # Create and run the agent
         with get_db_session() as session:
             # Create agent from record
             agent = create_agent_from_record(agent_id, session)
-            
+
             # Prepare query
             query = {
                 "query": "What is the capital of France?"
             }
-            
+
             logger.info(f"Running agent with query: {query}")
-            
+
             # Run the agent
             result = agent.run(query)
-            
+
             # Print the result
             print("\nAgent Result:")
             print("=============")
             print(json.dumps(result, indent=2))
-            
+
             logger.info("Example execution completed")
-            
+
     except Exception as e:
         logger.error(f"Error running example: {str(e)}")
         print(f"Error: {str(e)}")

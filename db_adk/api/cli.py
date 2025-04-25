@@ -176,77 +176,176 @@ def create_agent(
     required=False,
     help="Direct query text (alternative to input file)",
 )
-def run_agent_cmd(agent_id, input_file, query):
-    """Run an agent with given input, either from a file or direct query text."""
-    # Check that we have either an input file or a direct query
-    if not input_file and not query:
-        logger.error("Error: Either --input or --query is required")
-        click.echo("Error: Either --input or --query is required", err=True)
+@click.option(
+    "--chat",
+    "-c",
+    is_flag=True,
+    default=False,
+    help="Start an interactive chat session",
+)
+def run_agent_cmd(agent_id, input_file, query, chat):
+    """Run an agent with input data.
+
+    Args:
+        agent_id: ID of the agent to run
+        input_file: Path to input JSON file (optional)
+        query: Direct query text (alternative to input file)
+        chat: Start an interactive chat session
+    """
+    if not input_file and not query and not chat:
+        console.print(
+            "Error: Either --input, --query, or --chat option must be provided",
+            style="bold red",
+        )
         sys.exit(1)
 
-    # Prepare input data
-    if input_file:
+    # Handle chat mode for interactive sessions
+    if chat:
+        console.print("\n[bold]Starting agent chat session...[/]")
+
+        # Get agent name
+        with get_db_session() as session:
+            agent_record = session.query(Agent).filter(Agent.id == agent_id).first()
+            agent_name = agent_record.name if agent_record else f"Agent {agent_id}"
+
+        console.print(f"\n[bold green]Starting chat with [bold cyan]{agent_name}[/][/]")
+        console.print(
+            "[dim](Type 'exit', 'quit', or Ctrl+D to end the conversation)[/]"
+        )
+
+        # Import session management
+        from ..core.runner_v030 import (
+            create_content_message,
+            extract_response_from_events,
+            setup_runner,
+        )
+
+        # Initial setup - create agent and runner once to maintain session
         try:
-            with open(input_file, "r") as f:
-                input_data = json.load(f)
+            with get_db_session() as db_session:
+                # Create agent
+                from ..core.agent_factory import create_agent_from_record
+
+                agent = create_agent_from_record(agent_id, db_session)
+
+                # Set up user ID and session ID
+                import uuid
+
+                user_id = f"user_{uuid.uuid4().hex[:8]}"
+                session_id = f"session_{uuid.uuid4().hex[:8]}"
+
+                # Create runner and session service
+                runner, session_service = setup_runner(agent, user_id, session_id)
+
+                # Chat loop
+                # Get initial input - either from --query or prompt the user
+                if query:
+                    initial_input = query
+                else:
+                    console.print("\n[bold cyan]You:[/] ", end="")
+                    initial_input = input()
+
+                while True:
+                    try:
+                        # Exit conditions
+                        if initial_input.lower() in ["exit", "quit"]:
+                            console.print("\n[bold green]Chat session ended[/]")
+                            break
+
+                        console.print()  # Add a line break for readability
+
+                        # Create content message
+                        content = create_content_message(initial_input)
+
+                        # Run the agent
+                        console.print("[dim]Processing...[/]")
+                        events = runner.run(
+                            user_id=user_id,
+                            session_id=session_id,
+                            new_message=content,
+                        )
+
+                        # Extract responses using the utility function
+                        responses = extract_response_from_events(events)
+
+                        response = (
+                            responses[0] if responses else "No response from agent"
+                        )
+                        console.print(f"[bold magenta]{agent_name}:[/] {response}\n")
+
+                        # Get next input
+                        console.print("[bold cyan]You:[/] ", end="")
+                        initial_input = input()
+
+                    except KeyboardInterrupt:
+                        console.print("\n[bold yellow]Chat session interrupted[/]")
+                        break
+                    except EOFError:
+                        console.print("\n[bold green]Chat session ended[/]")
+                        break
+                    except Exception as e:
+                        console.print(f"\n[bold red]Error: {str(e)}[/]")
+                        console.print("[dim]Continuing chat...[/]\n")
+
         except Exception as e:
-            logger.error(f"Error reading input file: {str(e)}")
-            click.echo(f"Error reading input file: {str(e)}", err=True)
+            console.print(f"\n[bold red]Error starting chat: {str(e)}[/]")
             sys.exit(1)
+
+        return
+
+    # Non-chat mode - handle single query
+    if input_file:
+        with open(input_file, "r") as f:
+            input_data = json.load(f)
     else:
         # For direct queries, use the query text directly
         input_data = query
 
-    with get_db_session() as session:
-        try:
-            # Always use the v0.3.0 runner for compatibility
-            from ..core.runner_v030 import run_agent_with_runner
+    try:
+        # Import runner functions
+        from ..core.runner_v030 import (
+            extract_response_from_events,
+            run_agent_with_runner,
+        )
 
-            # Get agent name to display
-            agent_record = session.query(Agent).filter(Agent.id == agent_id).first()
-            agent_name = agent_record.name if agent_record else f"Agent {agent_id}"
-
-            console.print(
-                f"Running agent [bold cyan]{agent_name}[/] with query...",
-                style="green",
-            )
-
-            # Run using v0.3.0 runner
+        # Get database session
+        with get_db_session() as session:
+            # Create agent and run it
             result = run_agent_with_runner(agent_id, input_data, session)
 
-            # Format the output nicely with Rich
-            if isinstance(result, dict):
-                console.print_json(json.dumps(result))
-            else:
+            # Check if result is a string (direct response) or events object
+            if isinstance(result, str):
+                # Direct response already provided
                 console.print(result)
-
-        except ImportError as e:
-            console.print("Google ADK dependency error:", style="bold red")
-            console.print(f"  {str(e)}", style="red")
-            console.print(
-                "\nThis is likely due to version incompatibility with the Google ADK library.",
-                style="yellow",
-            )
-            console.print(
-                "Please make sure you have the correct version installed or update the agent types in your database.",
-                style="yellow",
-            )
-            sys.exit(1)
-        except AttributeError as e:
-            if "has no attribute" in str(e) and "Agent" in str(e):
-                console.print("Google ADK agent type error:", style="bold red")
-                console.print(f"  {str(e)}", style="red")
-                console.print(
-                    "\nThe agent type defined in the database is not available in your installed Google ADK version.",
-                    style="yellow",
-                )
-                console.print(
-                    "Please check the available agent types in your Google ADK version and update your agent records accordingly.",
-                    style="yellow",
-                )
-                sys.exit(1)
             else:
-                raise
+                # Process events to extract responses
+                responses = extract_response_from_events(result)
+                response = responses[0] if responses else "No response from agent"
+                console.print(response)
+
+    except ImportError as e:
+        # Handle missing Google ADK dependencies
+        if "generative" in str(e):
+            console.print(
+                "[bold red]Error: Google ADK dependencies not found.[/]\n"
+                "Please install with: [bold]pip install db-adk[vertexai][/]"
+            )
+        else:
+            console.print(f"[bold red]Import error: {str(e)}[/]")
+        sys.exit(1)
+    except ValueError as e:
+        console.print(f"[bold red]Error: {str(e)}[/]")
+        # Catch specific agent type not supported errors
+        if "agent type not supported" in str(e).lower():
+            console.print(
+                "\n[yellow]Try installing additional dependencies:[/]"
+                "\nFor Vertex AI: [bold]pip install db-adk[vertexai][/]"
+                "\nFor OpenAI: [bold]pip install db-adk[openai][/]"
+            )
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[bold red]Error running agent: {str(e)}[/]")
+        sys.exit(1)
 
 
 @agents.command("export")
@@ -604,7 +703,8 @@ def create_relationship(parent_id, child_id, rel_type, order):
             session.add(relationship)
             session.commit()
             click.echo(
-                f"Created relationship: Parent {parent_id} -> Child {child_id} (Type: {rel_type}, Order: {order})"
+                f"Created relationship: Parent {parent_id} -> Child {child_id} "
+                f"(Type: {rel_type}, Order: {order})"
             )
     except Exception as e:
         logger.error(f"Error creating relationship: {str(e)}")
@@ -635,35 +735,34 @@ def networks():
     required=False,
     help="Direct query text (alternative to input file)",
 )
-def run_network_cmd(coordinator_id, input_file, query):
-    """Run an agent network with a coordinator, either from a file or direct query text."""
+@click.option(
+    "--chat",
+    "-c",
+    is_flag=True,
+    default=False,
+    help="Start an interactive chat session",
+)
+def run_network_cmd(coordinator_id, input_file, query, chat):
+    """Run an agent network with a coordinator agent.
+
+    Args:
+        coordinator_id: ID of the coordinator agent
+        input_file: Path to input JSON file (optional)
+        query: Direct query text (alternative to input file)
+        chat: Start an interactive chat session
+    """
     try:
-        if not input_file and not query:
+        if not input_file and not query and not chat:
             console.print(
-                "Error: Either --input or --query must be provided", style="bold red"
+                "Error: Either --input, --query, or --chat option must be provided",
+                style="bold red",
             )
             sys.exit(1)
 
-        if input_file and query:
-            console.print(
-                "Warning: Both input file and query provided. Using input file.",
-                style="yellow",
-            )
-
-        if input_file:
-            with open(input_file, "r") as f:
-                input_data = json.load(f)
-        else:
-            # For v0.3.0 compatibility, use the query text directly
-            # rather than wrapping in a dictionary
-            input_data = query
-
-        with get_db_session() as session:
-            try:
-                # Always use the v0.3.0 runner
-                from ..core.runner_v030 import run_network_with_runner
-
-                # Get agent name to display
+        # Handle chat mode
+        if chat:
+            # Get agent name
+            with get_db_session() as session:
                 agent_record = (
                     session.query(Agent).filter(Agent.id == coordinator_id).first()
                 )
@@ -673,49 +772,150 @@ def run_network_cmd(coordinator_id, input_file, query):
                     else f"Network Coordinator {coordinator_id}"
                 )
 
-                console.print(
-                    f"Running agent network with coordinator [bold cyan]{agent_name}[/]...",
-                    style="green",
-                )
+            console.print(
+                f"\n[bold green]Starting chat with network "
+                f"[bold cyan]{agent_name}[/][/]"
+            )
+            console.print(
+                "[dim](Type 'exit', 'quit', or Ctrl+D to end the conversation)[/]"
+            )
 
-                # Run using v0.3.0 runner
+            # Import session management
+            from ..core.runner_v030 import (
+                create_content_message,
+                extract_response_from_events,
+                setup_runner,
+            )
+
+            # Initial setup - create agent and runner once to maintain session
+            try:
+                with get_db_session() as db_session:
+                    # Create coordinator agent
+                    from ..core.agent_factory import create_agent_from_record
+
+                    coordinator = create_agent_from_record(coordinator_id, db_session)
+
+                    # Set up user ID and session ID
+                    import uuid
+
+                    user_id = f"user_{uuid.uuid4().hex[:8]}"
+                    session_id = f"session_{uuid.uuid4().hex[:8]}"
+
+                    # Create runner and session service
+                    runner, session_service = setup_runner(
+                        coordinator, user_id, session_id
+                    )
+
+                    # Chat loop
+                    # Get initial input - either from --query or prompt the user
+                    if query:
+                        initial_input = query
+                    else:
+                        console.print("\n[bold cyan]You:[/] ", end="")
+                        initial_input = input()
+
+                    while True:
+                        try:
+                            # Exit conditions
+                            if initial_input.lower() in ["exit", "quit"]:
+                                console.print("\n[bold green]Chat session ended[/]")
+                                break
+
+                            console.print()  # Add a line break for readability
+
+                            # Create content message
+                            content = create_content_message(initial_input)
+
+                            # Run the agent
+                            console.print("[dim]Processing...[/]")
+                            events = runner.run(
+                                user_id=user_id,
+                                session_id=session_id,
+                                new_message=content,
+                            )
+
+                            # Extract responses using the utility function
+                            responses = extract_response_from_events(events)
+
+                            response = (
+                                responses[0]
+                                if responses
+                                else "No response from agent network"
+                            )
+                            console.print(
+                                f"[bold magenta]{agent_name}:[/] {response}\n"
+                            )
+
+                            # Get next input
+                            console.print("[bold cyan]You:[/] ", end="")
+                            initial_input = input()
+
+                        except KeyboardInterrupt:
+                            console.print("\n[bold yellow]Chat session interrupted[/]")
+                            break
+                        except EOFError:
+                            console.print("\n[bold green]Chat session ended[/]")
+                            break
+                        except Exception as e:
+                            console.print(f"\n[bold red]Error: {str(e)}[/]")
+                            console.print("[dim]Continuing chat...[/]\n")
+
+            except Exception as e:
+                console.print(f"\n[bold red]Error starting chat: {str(e)}[/]")
+                sys.exit(1)
+
+            return
+
+        # Non-chat mode - handle single query
+        if input_file:
+            with open(input_file, "r") as f:
+                input_data = json.load(f)
+        else:
+            # For direct queries, use the query text directly
+            input_data = query
+
+        # Import runner function
+        from ..core.runner_v030 import (
+            extract_response_from_events,
+            run_network_with_runner,
+        )
+
+        # Run the network
+        try:
+            with get_db_session() as session:
                 result = run_network_with_runner(coordinator_id, input_data, session)
 
-                # Format the output nicely with Rich
-                if isinstance(result, dict):
-                    console.print_json(json.dumps(result))
-                else:
+                # Check if result is a string (direct response) or events object
+                if isinstance(result, str):
+                    # Direct response already provided
                     console.print(result)
-            except ImportError as e:
-                console.print("Google ADK dependency error:", style="bold red")
-                console.print(f"  {str(e)}", style="red")
-                console.print(
-                    "\nThis is likely due to version incompatibility with the Google ADK library.",
-                    style="yellow",
-                )
-                console.print(
-                    "Please make sure you have the correct version installed or update the agent types in your database.",
-                    style="yellow",
-                )
-                sys.exit(1)
-            except AttributeError as e:
-                if "has no attribute" in str(e) and "Agent" in str(e):
-                    console.print("Google ADK agent type error:", style="bold red")
-                    console.print(f"  {str(e)}", style="red")
-                    console.print(
-                        "\nThe agent type defined in the database is not available in your installed Google ADK version.",
-                        style="yellow",
-                    )
-                    console.print(
-                        "Please check the available agent types in your Google ADK version and update your agent records accordingly.",
-                        style="yellow",
-                    )
-                    sys.exit(1)
                 else:
-                    raise
+                    # Process events to extract responses
+                    responses = extract_response_from_events(result)
+                    response = (
+                        responses[0] if responses else "No response from agent network"
+                    )
+                    console.print(response)
+
+        except ImportError as e:
+            # Handle missing Google ADK dependencies
+            if "generative" in str(e):
+                console.print(
+                    "[bold red]Error: Google ADK dependencies not found.[/]\n"
+                    "Please install with: [bold]pip install db-adk[vertexai][/]"
+                )
+            else:
+                console.print(f"[bold red]Import error: {str(e)}[/]")
+            sys.exit(1)
+        except ValueError as e:
+            console.print(f"[bold red]Error: {str(e)}[/]")
+            sys.exit(1)
+        except Exception as e:
+            console.print(f"[bold red]Error running network: {str(e)}[/]")
+            sys.exit(1)
+
     except Exception as e:
-        logger.error(f"Error running network: {str(e)}")
-        console.print(f"Error running network: {str(e)}", style="bold red")
+        console.print(f"[bold red]Error: {str(e)}[/]")
         sys.exit(1)
 
 
