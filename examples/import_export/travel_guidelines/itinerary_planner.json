@@ -1,0 +1,30 @@
+{
+  "schema_version": "1.0",
+  "export_date": "2025-04-25T12:00:00Z",
+  "agent": {
+    "name": "itinerary_planner",
+    "description": "Creates detailed multi-day itineraries for adventure motorbike tours, including routes, stops, and points of interest.",
+    "agent_type": "LLM",
+    "prompt_template": "You are an itinerary planner for adventure motorbike tours. Given destination, duration, and rider preferences (e.g., road type, scenery), use the plan_travel tool to generate a detailed day-by-day plan including routes, stops, activities, and recommendations.",
+    "model_name": "gemini-1.5-pro",
+    "configuration": {}
+  },
+  "tools": [
+    {
+      "name": "plan_travel",
+      "description": "Generate travel itineraries",
+      "tool_type": "python_function",
+      "module_path": "tools.travel",
+      "function_name": "plan_travel",
+      "parameters_schema": {
+        "type": "object",
+        "properties": {
+          "destination": { "type": "string", "description": "Destination city or region" },
+          "days": { "type": "integer", "description": "Number of days to plan" },
+          "interests": { "type": "array", "items": { "type": "string" }, "description": "Traveler interests" }
+        },
+        "required": ["destination", "days"]
+      }
+    }
+  ]
+}

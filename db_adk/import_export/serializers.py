@@ -5,7 +5,7 @@ Serializers for converting agent data to and from JSON and YAML formats.
 import enum
 import json
 from pathlib import Path
-from typing import Any, Dict, Optional, Type, Union
+from typing import Any, Dict, Optional, Type, Union, cast
 
 import yaml
 
@@ -20,7 +20,7 @@ class SerializerFormat(str, enum.Enum):
 class AgentSerializer:
     """Base serializer class for agent import/export."""
 
-    FORMAT = None
+    FORMAT: Optional[SerializerFormat] = None
 
     @classmethod
     def serialize(cls, data: Dict[str, Any]) -> str:
@@ -82,7 +82,7 @@ class AgentSerializer:
 class JSONAgentSerializer(AgentSerializer):
     """JSON serializer for agent import/export."""
 
-    FORMAT = SerializerFormat.JSON
+    FORMAT: SerializerFormat = SerializerFormat.JSON
 
     @classmethod
     def serialize(cls, data: Dict[str, Any]) -> str:
@@ -92,13 +92,13 @@ class JSONAgentSerializer(AgentSerializer):
     @classmethod
     def deserialize(cls, content: str) -> Dict[str, Any]:
         """Deserialize JSON string to agent data."""
-        return json.loads(content)
+        return cast(Dict[str, Any], json.loads(content))
 
 
 class YAMLAgentSerializer(AgentSerializer):
     """YAML serializer for agent import/export."""
 
-    FORMAT = SerializerFormat.YAML
+    FORMAT: SerializerFormat = SerializerFormat.YAML
 
     @classmethod
     def serialize(cls, data: Dict[str, Any]) -> str:
@@ -108,7 +108,7 @@ class YAMLAgentSerializer(AgentSerializer):
     @classmethod
     def deserialize(cls, content: str) -> Dict[str, Any]:
         """Deserialize YAML string to agent data."""
-        return yaml.safe_load(content)
+        return cast(Dict[str, Any], yaml.safe_load(content))
 
 
 def get_serializer(

@@ -1,0 +1,28 @@
+{
+  "schema_version": "1.0",
+  "export_date": "2025-04-25T12:00:00Z",
+  "agent": {
+    "name": "weather_assistant",
+    "description": "Provides detailed weather forecasts and terrain conditions for adventure biking routes.",
+    "agent_type": "LLM",
+    "prompt_template": "You are a weather assistant specialized in adventure biking. When given a route and date, use the get_weather tool to fetch weather data and terrain impact information, then summarize how conditions may affect motorbike touring.",
+    "model_name": "gemini-1.5-pro",
+    "configuration": {}
+  },
+  "tools": [
+    {
+      "name": "get_weather",
+      "description": "Retrieve current and forecast weather data",
+      "tool_type": "python_function",
+      "module_path": "tools.weather",
+      "function_name": "get_weather",
+      "parameters_schema": {
+        "type": "object",
+        "properties": {
+          "location": { "type": "string", "description": "Location name or coordinates" }
+        },
+        "required": ["location"]
+      }
+    }
+  ]
+}

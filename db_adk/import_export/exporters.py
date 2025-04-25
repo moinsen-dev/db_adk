@@ -55,7 +55,7 @@ def prepare_agent_export(
 
     # Include tools if requested
     if include_tools and agent.tools:
-        tools_data = []
+        tools_data: List[Dict[str, Any]] = []
         for tool in agent.tools:
             tool_data = {
                 "name": tool.name,
@@ -79,7 +79,7 @@ def prepare_agent_export(
         )
 
         if parent_relationships:
-            relationships_data = []
+            relationships_data: List[Dict[str, Any]] = []
             for rel in parent_relationships:
                 child_agent = (
                     session.query(Agent).filter(Agent.id == rel.child_agent_id).first()
@@ -127,7 +127,7 @@ def export_agent(
     with get_db_session() as session:
         # Prepare agent data
         agent_data = prepare_agent_export(
-            agent_id, session, include_tools, include_relationships
+            int(agent_id), session, include_tools, include_relationships
         )
 
         # Serialize and write to file
@@ -170,7 +170,7 @@ def export_all_agents(
     # Get serializer
     serializer_class = get_serializer(format_name)
 
-    exported_files = []
+    exported_files: List[str] = []
 
     with get_db_session() as session:
         # Get all agents
@@ -179,7 +179,7 @@ def export_all_agents(
         for agent in agents:
             # Prepare agent data
             agent_data = prepare_agent_export(
-                agent.id, session, include_tools, include_relationships
+                int(agent.id), session, include_tools, include_relationships
             )
 
             # Generate output file path

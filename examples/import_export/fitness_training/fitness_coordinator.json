@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0",
+  "export_date": "2025-04-25T12:00:00Z",
+  "agent": {
+    "name": "fitness_coordinator",
+    "description": "Coordinates fitness planning, medical assessment, mental health support, nutrition guidance, and user intake for a personalized holistic training program.",
+    "agent_type": "Coordinator",
+    "prompt_template": "You are a fitness coordinator agent. You orchestrate a network of agents: an intake interviewer, medical assessor, mental health specialist, workout planner, and nutrition planner. Collect user goals, assess health constraints, support mental wellbeing, and produce a comprehensive fitness plan.",
+    "model_name": "gemini-1.5-pro",
+    "configuration": {}
+  },
+  "relationships": [
+    {
+      "child_agent_name": "intake_interviewer",
+      "relationship_type": "sequential",
+      "execution_order": 1
+    },
+    {
+      "child_agent_name": "medical_assessor",
+      "relationship_type": "sequential",
+      "execution_order": 2
+    },
+    {
+      "child_agent_name": "mental_health_specialist",
+      "relationship_type": "sequential",
+      "execution_order": 3
+    },
+    {
+      "child_agent_name": "workout_planner",
+      "relationship_type": "sequential",
+      "execution_order": 4
+    },
+    {
+      "child_agent_name": "nutrition_planner",
+      "relationship_type": "sequential",
+      "execution_order": 5
+    }
+  ]
+}

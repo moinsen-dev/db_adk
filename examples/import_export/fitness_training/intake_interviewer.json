@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "export_date": "2025-04-25T12:00:00Z",
+  "agent": {
+    "name": "intake_interviewer",
+    "description": "Conducts an initial interview to understand user goals, preferences, and constraints for a fitness program.",
+    "agent_type": "LLM",
+    "prompt_template": "You are an intake interviewer. Ask the user about their fitness goals, current activity level, schedule, preferences, and any limitations or injuries. Summarize the responses.",
+    "model_name": "gemini-1.5-pro",
+    "configuration": {}
+  }
+}

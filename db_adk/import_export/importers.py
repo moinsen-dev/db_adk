@@ -205,7 +205,7 @@ def create_agent_from_data(
 
     # Flush to get agent ID
     session.flush()
-    agent_id = agent.id
+    agent_id = int(agent.id)  # Explicitly cast to int to handle Column[int] type
 
     # Import tools if included
     if "tools" in data and data["tools"]:
@@ -389,7 +389,9 @@ def import_agents_from_directory(
                 agent = session.query(Agent).filter(Agent.name == agent_name).first()
                 if agent:
                     try:
-                        import_relationships(agent.id, relationships, session, options)
+                        import_relationships(
+                            int(agent.id), relationships, session, options
+                        )
                     except Exception as e:
                         logger.error(
                             f"Error importing relationships for {agent_name}: {str(e)}"

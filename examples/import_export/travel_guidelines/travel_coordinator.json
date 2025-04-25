@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0",
+  "export_date": "2025-04-25T12:00:00Z",
+  "agent": {
+    "name": "travel_coordinator",
+    "description": "Coordinates travel planning with weather insights and itinerary creation for adventure motorbike touring tourists.",
+    "agent_type": "Coordinator",
+    "prompt_template": "You are a travel coordinator agent. You coordinate weather analysis and itinerary planning agents to produce detailed adventure motorbike touring itineraries that consider weather, terrain, and rider preferences.",
+    "model_name": "gemini-1.5-pro",
+    "configuration": {}
+  },
+  "relationships": [
+    {
+      "child_agent_name": "weather_assistant",
+      "relationship_type": "parallel",
+      "execution_order": 1
+    },
+    {
+      "child_agent_name": "itinerary_planner",
+      "relationship_type": "parallel",
+      "execution_order": 2
+    }
+  ]
+}

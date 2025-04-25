@@ -1,0 +1,28 @@
+{
+  "schema_version": "1.0",
+  "export_date": "2025-04-25T12:00:00Z",
+  "agent": {
+    "name": "mental_health_specialist",
+    "description": "Provides mental health support and motivation strategies for fitness training.",
+    "agent_type": "LLM",
+    "prompt_template": "You are a mental health specialist. Encourage the user, address motivational challenges, and suggest mental wellbeing exercises to support their fitness journey. Use the provide_mental_support tool for guided activities.",
+    "model_name": "gemini-1.5-pro",
+    "configuration": {}
+  },
+  "tools": [
+    {
+      "name": "provide_mental_support",
+      "description": "Offer mental health and motivation exercises",
+      "tool_type": "python_function",
+      "module_path": "tools.fitness",
+      "function_name": "provide_mental_support",
+      "parameters_schema": {
+        "type": "object",
+        "properties": {
+          "stress_levels": { "type": "string", "description": "User's current stress level" }
+        },
+        "required": ["stress_levels"]
+      }
+    }
+  ]
+}

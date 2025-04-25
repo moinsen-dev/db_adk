@@ -1,0 +1,28 @@
+{
+  "schema_version": "1.0",
+  "export_date": "2025-04-25T12:00:00Z",
+  "agent": {
+    "name": "medical_assessor",
+    "description": "Assesses medical history, injuries, and health constraints for safe training recommendations.",
+    "agent_type": "LLM",
+    "prompt_template": "You are a medical assessor. Given user's medical history and any injuries, provide safe training constraints and recommendations. Use the assess_health tool for structured evaluation.",
+    "model_name": "gemini-1.5-pro",
+    "configuration": {}
+  },
+  "tools": [
+    {
+      "name": "assess_health",
+      "description": "Provide structured medical assessment",
+      "tool_type": "python_function",
+      "module_path": "tools.fitness",
+      "function_name": "assess_health",
+      "parameters_schema": {
+        "type": "object",
+        "properties": {
+          "medical_history": { "type": "string" }
+        },
+        "required": ["medical_history"]
+      }
+    }
+  ]
+}
