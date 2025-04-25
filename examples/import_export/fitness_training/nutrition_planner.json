@@ -5,7 +5,7 @@
     "name": "nutrition_planner",
     "description": "Generates nutrition plans and dietary recommendations tailored to fitness goals and health status.",
     "agent_type": "LLM",
-    "prompt_template": "You are a nutrition planner. Use the plan_nutrition tool to create meal plans that support the user's workout program, dietary preferences, and medical constraints.",
+    "prompt_template": "You are a nutrition planner specializing in fitness-related diets. Create personalized nutrition plans based on user goals, preferences, health status, and workout regimen. Provide meal suggestions, macronutrient targets, and practical eating tips.",
     "model_name": "gemini-1.5-pro",
     "configuration": {}
   },
@@ -19,8 +19,15 @@
       "parameters_schema": {
         "type": "object",
         "properties": {
-          "preferences": { "type": "array", "items": { "type": "string" }, "description": "Dietary preferences or restrictions" },
-          "calorie_target": { "type": "integer", "description": "Daily calorie target" }
+          "preferences": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Dietary preferences or restrictions"
+          },
+          "calorie_target": {
+            "type": "integer",
+            "description": "Daily calorie target"
+          }
         },
         "required": ["preferences"]
       }

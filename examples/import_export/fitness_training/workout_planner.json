@@ -5,7 +5,7 @@
     "name": "workout_planner",
     "description": "Designs a personalized workout regimen based on user goals, health constraints, and preferences.",
     "agent_type": "LLM",
-    "prompt_template": "You are a workout planner. Use the plan_workout tool to create a structured exercise program that aligns with the user's goals and constraints. Provide weekly schedules, exercise descriptions, and progression guidelines.",
+    "prompt_template": "You are a workout planner specializing in personalized fitness programs. Create appropriate exercise regimens based on user goals, fitness level, age, health constraints, and preferences. Include frequency, duration, exercise types, progression plans, and adaptation strategies.",
     "model_name": "gemini-1.5-pro",
     "configuration": {}
   },

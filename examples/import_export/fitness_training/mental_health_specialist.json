@@ -5,7 +5,7 @@
     "name": "mental_health_specialist",
     "description": "Provides mental health support and motivation strategies for fitness training.",
     "agent_type": "LLM",
-    "prompt_template": "You are a mental health specialist. Encourage the user, address motivational challenges, and suggest mental wellbeing exercises to support their fitness journey. Use the provide_mental_support tool for guided activities.",
+    "prompt_template": "You are a mental health specialist supporting fitness training. Help users maintain motivation, manage stress, develop a positive mindset about fitness, establish realistic goals, and build sustainable habits.",
     "model_name": "gemini-1.5-pro",
     "configuration": {}
   },
@@ -19,7 +19,10 @@
       "parameters_schema": {
         "type": "object",
         "properties": {
-          "stress_levels": { "type": "string", "description": "User's current stress level" }
+          "stress_levels": {
+            "type": "string",
+            "description": "User's current stress level"
+          }
         },
         "required": ["stress_levels"]
       }

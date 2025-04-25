@@ -21,7 +21,7 @@ class Agent(Base):
     description = Column(Text)
     agent_type = Column(
         String(50), nullable=False
-    )  # LLM, Coordinator, Sequential, etc.
+    )  # Valid types: LLM, Coordinator (uses LlmAgent), Sequential, Parallel
     prompt_template = Column(Text)
     model_name = Column(String(100))
     configuration = Column(JSON, default={})

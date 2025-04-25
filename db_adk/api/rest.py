@@ -207,14 +207,38 @@ def run_agent(agent_id: int, input_data: Dict[str, Any]):
     """Run an agent with given input."""
     try:
         with get_db_session() as session:
-            # Create agent from database record
-            agent = create_agent_from_record(agent_id, session)
+            # Detect if we should use the v0.3.0 compatible runner
+            adk_version = None
+            try:
+                import google.adk
 
-            # Run the agent
-            logger.info(f"Running agent: {agent.name} (ID: {agent_id})")
-            result = agent.run(input_data)
+                adk_version = getattr(google.adk, "__version__", None)
+            except (ImportError, AttributeError):
+                pass
+
+            # Use v0.3.0 runner if ADK version is 0.3.0 or higher
+            use_v030_runner = (
+                adk_version is not None
+                and isinstance(adk_version, str)
+                and adk_version >= "0.3.0"
+            )
+
+            # Run with the appropriate runner
+            if use_v030_runner:
+                # Import here to avoid circular imports
+                from ..core.runner_v030 import run_agent_with_runner
+
+                logger.info(f"Running agent {agent_id} with v0.3.0 compatible runner")
+                result = run_agent_with_runner(agent_id, input_data, session)
+            else:
+                # Create agent from database record using the traditional approach
+                agent = create_agent_from_record(agent_id, session)
+
+                # Run the agent
+                logger.info(f"Running agent: {agent.name} (ID: {agent_id})")
+                result = agent.run(input_data)
+
             logger.info("Agent execution completed")
-
             return {"result": result}
     except Exception as e:
         logger.error(f"Error running agent {agent_id}: {str(e)}")
@@ -465,13 +489,41 @@ def run_network_endpoint(coordinator_id: int, input_data: Dict[str, Any]):
     """Run an agent network with given input."""
     try:
         with get_db_session() as session:
-            # Run the network
-            result = run_agent_network(coordinator_id, input_data, session)
+            # Detect if we should use the v0.3.0 compatible runner
+            adk_version = None
+            try:
+                import google.adk
 
+                adk_version = getattr(google.adk, "__version__", None)
+            except (ImportError, AttributeError):
+                pass
+
+            # Use v0.3.0 runner if ADK version is 0.3.0 or higher
+            use_v030_runner = (
+                adk_version is not None
+                and isinstance(adk_version, str)
+                and adk_version >= "0.3.0"
+            )
+
+            # Run with the appropriate runner
+            if use_v030_runner:
+                # Import here to avoid circular imports
+                from ..core.runner_v030 import run_network_with_runner
+
+                logger.info(
+                    f"Running network with coordinator {coordinator_id} using v0.3.0 compatible runner"
+                )
+                result = run_network_with_runner(coordinator_id, input_data, session)
+            else:
+                # Use the traditional network runner
+                logger.info(f"Running network with coordinator ID: {coordinator_id}")
+                result = run_agent_network(coordinator_id, input_data, session)
+
+            logger.info("Network execution completed")
             return {"result": result}
     except Exception as e:
         logger.error(
-            f"Error running agent network with coordinator {coordinator_id}: {str(e)}"
+            f"Error running network with coordinator {coordinator_id}: {str(e)}"
         )
         raise HTTPException(status_code=500, detail=str(e))
 

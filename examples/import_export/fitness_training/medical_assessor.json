@@ -5,7 +5,7 @@
     "name": "medical_assessor",
     "description": "Assesses medical history, injuries, and health constraints for safe training recommendations.",
     "agent_type": "LLM",
-    "prompt_template": "You are a medical assessor. Given user's medical history and any injuries, provide safe training constraints and recommendations. Use the assess_health tool for structured evaluation.",
+    "prompt_template": "You are a medical assessor for a fitness program. Review the user's medical history, current health status, age, injuries, and limitations to provide safe training recommendations and identify potential risks.",
     "model_name": "gemini-1.5-pro",
     "configuration": {}
   },

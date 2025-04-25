@@ -6,10 +6,12 @@ import json
 import sys
 
 import click
+from rich.console import Console
+from rich.table import Table
 
 from ..core.agent_factory import create_agent_from_record
 from ..core.network_manager import run_agent_network
-from ..db.connection import get_db_session, init_db
+from ..db.connection import clear_db, get_db_session, init_db
 from ..db.models import Agent, AgentRelationship, AgentTool, Tool
 from ..import_export import (
     ImportOptions,
@@ -23,6 +25,7 @@ from .rest import start_server
 
 # Initialize logger
 logger = get_logger(__name__)
+console = Console()
 
 
 @click.group()
@@ -50,6 +53,30 @@ def init_database():
         sys.exit(1)
 
 
+@db.command("clear")
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Skip confirmation prompt",
+)
+def clear_database(force):
+    """Clear all data from the database by dropping and recreating all tables."""
+    if not force:
+        if not click.confirm(
+            "This will delete ALL data from the database. Are you sure?"
+        ):
+            click.echo("Operation cancelled")
+            return
+
+    try:
+        clear_db()
+        click.echo("Database cleared successfully")
+    except Exception as e:
+        logger.error(f"Error clearing database: {str(e)}")
+        click.echo(f"Error clearing database: {str(e)}", err=True)
+        sys.exit(1)
+
+
 # Agent commands
 @cli.group()
 def agents():
@@ -64,18 +91,34 @@ def list_agents():
         with get_db_session() as session:
             agents = session.query(Agent).all()
             if not agents:
-                click.echo("No agents found")
+                console.print("No agents found", style="yellow")
                 return
 
-            click.echo("ID | Name | Type | Description")
-            click.echo("-" * 50)
+            table = Table(title="Available Agents")
+            table.add_column("ID", style="cyan", justify="right")
+            table.add_column("Name", style="green")
+            table.add_column("Type", style="magenta")
+            table.add_column("Model", style="blue")
+            table.add_column("Description", style="yellow")
+
             for agent in agents:
-                click.echo(
-                    f"{agent.id} | {agent.name} | {agent.agent_type} | {agent.description}"
+                # At runtime, these are actual values, not Column objects
+                # The type checker is confused by SQLAlchemy's typing
+                model_name = "None" if agent.model_name is None else agent.model_name
+                description = "" if agent.description is None else agent.description
+
+                table.add_row(
+                    str(agent.id),
+                    agent.name,  # type: ignore
+                    agent.agent_type,  # type: ignore
+                    model_name,  # type: ignore
+                    description,  # type: ignore
                 )
+
+            console.print(table)
     except Exception as e:
         logger.error(f"Error listing agents: {str(e)}")
-        click.echo(f"Error listing agents: {str(e)}", err=True)
+        console.print(f"Error listing agents: {str(e)}", style="bold red")
         sys.exit(1)
 
 
@@ -125,23 +168,136 @@ def create_agent(
     "--input",
     "input_file",
     type=click.Path(exists=True),
-    required=True,
+    required=False,
     help="Input JSON file",
 )
-def run_agent_cmd(agent_id, input_file):
-    """Run an agent with given input."""
-    try:
-        with open(input_file, "r") as f:
-            input_data = json.load(f)
-
-        with get_db_session() as session:
-            agent = create_agent_from_record(agent_id, session)
-            result = agent.run(input_data)
-            click.echo(json.dumps(result, indent=2))
-    except Exception as e:
-        logger.error(f"Error running agent: {str(e)}")
-        click.echo(f"Error running agent: {str(e)}", err=True)
+@click.option(
+    "--query",
+    "-q",
+    type=str,
+    required=False,
+    help="Direct query text (alternative to input file)",
+)
+@click.option(
+    "--use-v030",
+    is_flag=True,
+    default=False,
+    help="Force using v0.3.0 compatible runner",
+)
+def run_agent_cmd(agent_id, input_file, query, use_v030):
+    """Run an agent with given input, either from a file or direct query text."""
+    # Check that we have either an input file or a direct query
+    if not input_file and not query:
+        logger.error("Error: Either --input or --query is required")
+        click.echo("Error: Either --input or --query is required", err=True)
         sys.exit(1)
+
+    # Prepare input data
+    if input_file:
+        try:
+            with open(input_file, "r") as f:
+                input_data = json.load(f)
+        except Exception as e:
+            logger.error(f"Error reading input file: {str(e)}")
+            click.echo(f"Error reading input file: {str(e)}", err=True)
+            sys.exit(1)
+    else:
+        # For direct queries, use the query text directly
+        input_data = query
+
+    with get_db_session() as session:
+        try:
+            # Detect if we should use the v0.3.0 compatible runner
+            adk_version = None
+            try:
+                import google.adk
+
+                adk_version = getattr(google.adk, "__version__", None)
+            except (ImportError, AttributeError):
+                pass
+
+            # Use v0.3.0 runner if explicitly requested or if ADK version is 0.3.0 or higher
+            use_v030_runner = use_v030 or (
+                adk_version is not None
+                and isinstance(adk_version, str)
+                and adk_version >= "0.3.0"
+            )
+
+            if use_v030_runner:
+                # Import here to avoid circular imports
+                from ..core.runner_v030 import run_agent_with_runner
+
+                console.print(
+                    f"Using v0.3.0 compatible runner for ADK version: {adk_version or 'unknown'}",
+                    style="yellow",
+                )
+
+                # Get agent name to display
+                agent_record = session.query(Agent).filter(Agent.id == agent_id).first()
+                agent_name = agent_record.name if agent_record else f"Agent {agent_id}"
+
+                console.print(
+                    f"Running agent [bold cyan]{agent_name}[/] with query...",
+                    style="green",
+                )
+
+                # Run using v0.3.0 runner
+                result = run_agent_with_runner(agent_id, input_data, session)
+            else:
+                # Create the agent using the traditional method
+                agent = create_agent_from_record(agent_id, session)
+
+                console.print(
+                    f"Running agent [bold cyan]{agent.name}[/] with query...",
+                    style="green",
+                )
+
+                # Use run_async with a simple string input for ADK compatibility
+                import asyncio
+
+                async def collect_results():
+                    result = []
+                    async for resp in agent.run_async(input_data):
+                        if resp:
+                            result.append(resp)
+                    return result[-1] if result else "No response from agent"
+
+                # Run the async generator and collect the results
+                result = asyncio.run(collect_results())
+
+            # Format the output nicely with Rich
+            if isinstance(result, dict):
+                console.print_json(json.dumps(result))
+            else:
+                console.print(result)
+
+        except ImportError as e:
+            console.print("Google ADK dependency error:", style="bold red")
+            console.print(f"  {str(e)}", style="red")
+            console.print(
+                "\nThis is likely due to version incompatibility with the Google ADK library.",
+                style="yellow",
+            )
+            console.print(
+                "Please make sure you have the correct version installed or update the agent types in your database.",
+                style="yellow",
+            )
+            sys.exit(1)
+        except AttributeError as e:
+            if "has no attribute" in str(e) and "Agent" in str(e):
+                console.print("Google ADK agent type error:", style="bold red")
+                console.print(f"  {str(e)}", style="red")
+                console.print(
+                    "\nThe agent type defined in the database is not available in your installed Google ADK version.",
+                    style="yellow",
+                )
+                console.print(
+                    "Please check the available agent types in your Google ADK version and update your agent records accordingly.",
+                    style="yellow",
+                )
+                sys.exit(1)
+            else:
+                raise
 
 
 @agents.command("export")
@@ -316,18 +472,30 @@ def list_tools():
         with get_db_session() as session:
             tools = session.query(Tool).all()
             if not tools:
-                click.echo("No tools found")
+                console.print("No tools found", style="yellow")
                 return
 
-            click.echo("ID | Name | Type | Module | Function")
-            click.echo("-" * 60)
+            table = Table(title="Available Tools")
+            table.add_column("ID", style="cyan", justify="right")
+            table.add_column("Name", style="green")
+            table.add_column("Type", style="magenta")
+            table.add_column("Module", style="blue")
+            table.add_column("Function", style="yellow")
+
             for tool in tools:
-                click.echo(
-                    f"{tool.id} | {tool.name} | {tool.tool_type} | {tool.module_path} | {tool.function_name}"
+                # At runtime, these are actual values, not Column objects
+                table.add_row(
+                    str(tool.id),
+                    tool.name,  # type: ignore
+                    tool.tool_type,  # type: ignore
+                    tool.module_path,  # type: ignore
+                    tool.function_name,  # type: ignore
                 )
+
+            console.print(table)
     except Exception as e:
         logger.error(f"Error listing tools: {str(e)}")
-        click.echo(f"Error listing tools: {str(e)}", err=True)
+        console.print(f"Error listing tools: {str(e)}", style="bold red")
         sys.exit(1)
 
 
@@ -423,16 +591,27 @@ def list_agent_tools(agent_id):
             mappings = query.all()
 
             if not mappings:
-                click.echo("No mappings found")
+                console.print("No mappings found", style="yellow")
                 return
 
-            click.echo("Agent ID | Agent Name | Tool ID | Tool Name")
-            click.echo("-" * 60)
+            table = Table(title="Agent-Tool Mappings")
+            table.add_column("Agent ID", style="cyan", justify="right")
+            table.add_column("Agent Name", style="green")
+            table.add_column("Tool ID", style="cyan", justify="right")
+            table.add_column("Tool Name", style="yellow")
+
             for mapping, agent, tool in mappings:
-                click.echo(f"{agent.id} | {agent.name} | {tool.id} | {tool.name}")
+                table.add_row(
+                    str(agent.id),
+                    agent.name,  # type: ignore
+                    str(tool.id),
+                    tool.name,  # type: ignore
+                )
+
+            console.print(table)
     except Exception as e:
         logger.error(f"Error listing agent-tool mappings: {str(e)}")
-        click.echo(f"Error listing agent-tool mappings: {str(e)}", err=True)
+        console.print(f"Error listing agent-tool mappings: {str(e)}", style="bold red")
         sys.exit(1)
 
 
@@ -497,21 +676,130 @@ def networks():
     "--input",
     "input_file",
     type=click.Path(exists=True),
-    required=True,
+    required=False,
     help="Input JSON file",
 )
-def run_network_cmd(coordinator_id, input_file):
-    """Run an agent network with a coordinator."""
+@click.option(
+    "--query",
+    "-q",
+    type=str,
+    required=False,
+    help="Direct query text (alternative to input file)",
+)
+@click.option(
+    "--use-v030",
+    is_flag=True,
+    default=False,
+    help="Force using v0.3.0 compatible runner",
+)
+def run_network_cmd(coordinator_id, input_file, query, use_v030):
+    """Run an agent network with a coordinator, either from a file or direct query text."""
     try:
-        with open(input_file, "r") as f:
-            input_data = json.load(f)
+        if not input_file and not query:
+            console.print(
+                "Error: Either --input or --query must be provided", style="bold red"
+            )
+            sys.exit(1)
+
+        if input_file and query:
+            console.print(
+                "Warning: Both input file and query provided. Using input file.",
+                style="yellow",
+            )
+
+        if input_file:
+            with open(input_file, "r") as f:
+                input_data = json.load(f)
+        else:
+            # For v0.3.0 compatibility, use the query text directly
+            # rather than wrapping in a dictionary
+            input_data = query
 
         with get_db_session() as session:
-            result = run_agent_network(coordinator_id, input_data, session)
-            click.echo(json.dumps(result, indent=2))
+            try:
+                # Detect if we should use the v0.3.0 compatible runner
+                adk_version = None
+                try:
+                    import google.adk
+
+                    adk_version = getattr(google.adk, "__version__", None)
+                except (ImportError, AttributeError):
+                    pass
+
+                # Use v0.3.0 runner if explicitly requested or if ADK version is 0.3.0 or higher
+                use_v030_runner = use_v030 or (
+                    adk_version is not None
+                    and isinstance(adk_version, str)
+                    and adk_version >= "0.3.0"
+                )
+
+                # Get agent name to display
+                agent_record = (
+                    session.query(Agent).filter(Agent.id == coordinator_id).first()
+                )
+                agent_name = (
+                    agent_record.name
+                    if agent_record
+                    else f"Network Coordinator {coordinator_id}"
+                )
+
+                console.print(
+                    f"Running agent network with coordinator [bold cyan]{agent_name}[/]...",
+                    style="green",
+                )
+
+                if use_v030_runner:
+                    # Import here to avoid circular imports
+                    from ..core.runner_v030 import run_network_with_runner
+
+                    console.print(
+                        f"Using v0.3.0 compatible runner for ADK version: {adk_version or 'unknown'}",
+                        style="yellow",
+                    )
+
+                    # Run using v0.3.0 runner
+                    result = run_network_with_runner(
+                        coordinator_id, input_data, session
+                    )
+                else:
+                    # Use the traditional runner
+                    result = run_agent_network(coordinator_id, input_data, session)
+
+                # Format the output nicely with Rich
+                if isinstance(result, dict):
+                    console.print_json(json.dumps(result))
+                else:
+                    console.print(result)
+            except ImportError as e:
+                console.print("Google ADK dependency error:", style="bold red")
+                console.print(f"  {str(e)}", style="red")
+                console.print(
+                    "\nThis is likely due to version incompatibility with the Google ADK library.",
+                    style="yellow",
+                )
+                console.print(
+                    "Please make sure you have the correct version installed or update the agent types in your database.",
+                    style="yellow",
+                )
+                sys.exit(1)
+            except AttributeError as e:
+                if "has no attribute" in str(e) and "Agent" in str(e):
+                    console.print("Google ADK agent type error:", style="bold red")
+                    console.print(f"  {str(e)}", style="red")
+                    console.print(
+                        "\nThe agent type defined in the database is not available in your installed Google ADK version.",
+                        style="yellow",
+                    )
+                    console.print(
+                        "Please check the available agent types in your Google ADK version and update your agent records accordingly.",
+                        style="yellow",
+                    )
+                    sys.exit(1)
+                else:
+                    raise
     except Exception as e:
         logger.error(f"Error running network: {str(e)}")
-        click.echo(f"Error running network: {str(e)}", err=True)
+        console.print(f"Error running network: {str(e)}", style="bold red")
         sys.exit(1)
 
 
