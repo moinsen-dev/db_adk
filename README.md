@@ -9,6 +9,7 @@ DB-ADK is a Python package that extends Google's Agent Development Kit (ADK) to 
 - **Dynamic Loading**: Automatically load tools and create agents from database records
 - **Agent Networks**: Build complex multi-agent systems with different relationship types
 - **API Interfaces**: REST API and CLI for managing agents, tools, and networks
+- **Import/Export**: Export and import agents in JSON or YAML format for easy sharing and backup
 - **Extensible**: Easily add new tools and agent types
 
 ## Installation
@@ -106,6 +107,27 @@ db-adk agents run 1 --input input.json
 db-adk serve
 ```
 
+### 6. Import/Export Agents
+
+DB-ADK supports exporting and importing agents in both JSON and YAML formats:
+
+```bash
+# Export an agent to JSON (default)
+db-adk agents export 1 --output weather_agent.json
+
+# Export an agent to YAML
+db-adk agents export 1 --output weather_agent.yaml --format yaml
+
+# Export all agents to a directory
+db-adk agents export-all --output-dir agents_backup --format yaml
+
+# Import an agent from file (format auto-detected)
+db-adk agents import --file weather_agent.json
+
+# Import all agents from a directory
+db-adk agents import-dir --directory agents_backup
+```
+
 ## Architecture
 
 DB-ADK consists of the following components:
@@ -113,7 +135,8 @@ DB-ADK consists of the following components:
 1. **Database Layer**: SQLAlchemy models and repositories for database interactions
 2. **Core Layer**: Dynamic agent and tool factories
 3. **API Layer**: REST API and CLI interfaces
-4. **Utils**: Logging and schema validation utilities
+4. **Import/Export**: JSON and YAML import/export functionality
+5. **Utils**: Logging and schema validation utilities
 
 ### Database Schema
 
@@ -152,6 +175,9 @@ This example demonstrates:
 - `/agent-relationships/`: Manage agent relationships
 - `/agents/{agent_id}/run`: Run an agent
 - `/networks/{coordinator_id}/run`: Run an agent network
+- `/agents/{agent_id}/export`: Export an agent
+- `/agents/export-all`: Export all agents
+- `/agents/import`: Import an agent
 
 ### CLI Commands
 
@@ -159,6 +185,10 @@ This example demonstrates:
 - `db-adk agents list`: List all agents
 - `db-adk agents create`: Create a new agent
 - `db-adk agents run`: Run an agent
+- `db-adk agents export`: Export an agent to JSON or YAML
+- `db-adk agents export-all`: Export all agents to a directory
+- `db-adk agents import`: Import an agent from a file
+- `db-adk agents import-dir`: Import agents from a directory
 - `db-adk tools list`: List all tools
 - `db-adk tools create`: Create a new tool
 - `db-adk agent-tools assign`: Assign a tool to an agent

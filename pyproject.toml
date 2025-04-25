@@ -9,15 +9,17 @@ description = "Database-driven Agent Development Kit using Google ADK"
 requires-python = ">=3.13"
 readme = "README.md"
 license = { text = "MIT" }
+
 dependencies = [
-    "google-adk>=0.2.0",
-    "sqlalchemy>=2.0.0",
-    "fastapi>=0.100.0",
-    "uvicorn>=0.22.0",
-    "click>=8.1.0",
-    "pydantic>=2.0.0",
-    "python-dotenv>=1.0.0",
-    "jsonschema>=4.17.0",
+    "google-adk>=0.3.0",
+    "sqlalchemy>=2.0.40",
+    "fastapi>=0.115.12",
+    "uvicorn>=0.34.2",
+    "click>=8.1.8",
+    "pydantic>=2.11.3",
+    "python-dotenv>=1.1.0",
+    "jsonschema>=4.23.0",
+    "pyyaml>=6.0.2",
 ]
 
 [project.scripts]

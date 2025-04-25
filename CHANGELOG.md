@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Agent-to-agent communication framework
 - Tool discovery and integration system
 - JSON schema validation for tool parameters
+- Import/export functionality for agents in both JSON and YAML formats
+- Auto-detection of file formats during import
+- Batch import/export for agent directories
 
 ### Tech Stack
 - Python 3.9+
@@ -30,3 +33,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Click for CLI commands
 - SQLAlchemy ORM for database models
 - Python-dotenv for configuration management
+- PyYAML for YAML import/export support

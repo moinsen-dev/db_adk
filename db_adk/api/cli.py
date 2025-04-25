@@ -2,30 +2,41 @@
 Command-line interface for DB-ADK.
 """
 
-import click
 import json
-import os
 import sys
-from ..db.models import Agent, Tool, AgentTool, AgentRelationship
-from ..db.connection import get_db_session, init_db
+
+import click
+
 from ..core.agent_factory import create_agent_from_record
-from ..core.network_manager import create_agent_network, run_agent_network
+from ..core.network_manager import run_agent_network
+from ..db.connection import get_db_session, init_db
+from ..db.models import Agent, AgentRelationship, AgentTool, Tool
+from ..import_export import (
+    ImportOptions,
+    export_agent,
+    export_all_agents,
+    import_agent,
+    import_agents_from_directory,
+)
 from ..utils.logging import get_logger
 from .rest import start_server
 
 # Initialize logger
 logger = get_logger(__name__)
 
+
 @click.group()
 def cli():
     """Database-driven Agent Development Kit CLI."""
     pass
+
 
 # Database commands
 @cli.group()
 def db():
     """Manage database."""
     pass
+
 
 @db.command("init")
 def init_database():
@@ -38,11 +49,13 @@ def init_database():
         click.echo(f"Error initializing database: {str(e)}", err=True)
         sys.exit(1)
 
+
 # Agent commands
 @cli.group()
 def agents():
     """Manage agents."""
     pass
+
 
 @agents.command("list")
 def list_agents():
@@ -53,15 +66,18 @@ def list_agents():
             if not agents:
                 click.echo("No agents found")
                 return
-            
+
             click.echo("ID | Name | Type | Description")
             click.echo("-" * 50)
             for agent in agents:
-                click.echo(f"{agent.id} | {agent.name} | {agent.agent_type} | {agent.description}")
+                click.echo(
+                    f"{agent.id} | {agent.name} | {agent.agent_type} | {agent.description}"
+                )
     except Exception as e:
         logger.error(f"Error listing agents: {str(e)}")
         click.echo(f"Error listing agents: {str(e)}", err=True)
         sys.exit(1)
+
 
 @agents.command("create")
 @click.option("--name", required=True, help="Agent name")
@@ -69,15 +85,22 @@ def list_agents():
 @click.option("--type", "agent_type", required=True, help="Agent type")
 @click.option("--prompt", "prompt_template", help="Prompt template")
 @click.option("--model", "model_name", help="Model name")
-@click.option("--config", "config_file", type=click.Path(exists=True), help="Configuration JSON file")
-def create_agent(name, description, agent_type, prompt_template, model_name, config_file):
+@click.option(
+    "--config",
+    "config_file",
+    type=click.Path(exists=True),
+    help="Configuration JSON file",
+)
+def create_agent(
+    name, description, agent_type, prompt_template, model_name, config_file
+):
     """Create a new agent."""
     try:
         configuration = {}
         if config_file:
             with open(config_file, "r") as f:
                 configuration = json.load(f)
-        
+
         with get_db_session() as session:
             agent = Agent(
                 name=name,
@@ -85,7 +108,7 @@ def create_agent(name, description, agent_type, prompt_template, model_name, con
                 agent_type=agent_type,
                 prompt_template=prompt_template,
                 model_name=model_name,
-                configuration=configuration
+                configuration=configuration,
             )
             session.add(agent)
             session.commit()
@@ -95,15 +118,22 @@ def create_agent(name, description, agent_type, prompt_template, model_name, con
         click.echo(f"Error creating agent: {str(e)}", err=True)
         sys.exit(1)
 
+
 @agents.command("run")
 @click.argument("agent_id", type=int)
-@click.option("--input", "input_file", type=click.Path(exists=True), required=True, help="Input JSON file")
+@click.option(
+    "--input",
+    "input_file",
+    type=click.Path(exists=True),
+    required=True,
+    help="Input JSON file",
+)
 def run_agent_cmd(agent_id, input_file):
     """Run an agent with given input."""
     try:
         with open(input_file, "r") as f:
             input_data = json.load(f)
-        
+
         with get_db_session() as session:
             agent = create_agent_from_record(agent_id, session)
             result = agent.run(input_data)
@@ -113,11 +143,171 @@ def run_agent_cmd(agent_id, input_file):
         click.echo(f"Error running agent: {str(e)}", err=True)
         sys.exit(1)
 
+
+@agents.command("export")
+@click.argument("agent_id", type=int)
+@click.option("--output", "-o", required=True, help="Output file path")
+@click.option(
+    "--format",
+    "-f",
+    "format_name",
+    type=click.Choice(["json", "yaml"]),
+    help="Export format (default: determined from file extension)",
+)
+@click.option(
+    "--include-tools/--exclude-tools",
+    default=True,
+    help="Include tool definitions in export",
+)
+@click.option(
+    "--include-relationships/--exclude-relationships",
+    default=True,
+    help="Include agent relationships in export",
+)
+def export_agent_cmd(
+    agent_id, output, format_name, include_tools, include_relationships
+):
+    """Export an agent to a file."""
+    try:
+        output_file = export_agent(
+            agent_id,
+            output_file=output,
+            format_name=format_name,
+            include_tools=include_tools,
+            include_relationships=include_relationships,
+        )
+        click.echo(f"Agent exported to {output_file}")
+    except Exception as e:
+        logger.error(f"Error exporting agent: {str(e)}")
+        click.echo(f"Error exporting agent: {str(e)}", err=True)
+        sys.exit(1)
+
+
+@agents.command("export-all")
+@click.option("--output-dir", "-o", required=True, help="Output directory path")
+@click.option(
+    "--format",
+    "-f",
+    "format_name",
+    type=click.Choice(["json", "yaml"]),
+    default="json",
+    help="Export format (default: json)",
+)
+@click.option(
+    "--include-tools/--exclude-tools",
+    default=True,
+    help="Include tool definitions in export",
+)
+@click.option(
+    "--include-relationships/--exclude-relationships",
+    default=True,
+    help="Include agent relationships in export",
+)
+def export_all_agents_cmd(
+    output_dir, format_name, include_tools, include_relationships
+):
+    """Export all agents to files in a directory."""
+    try:
+        output_files = export_all_agents(
+            output_dir=output_dir,
+            format_name=format_name,
+            include_tools=include_tools,
+            include_relationships=include_relationships,
+        )
+        click.echo(f"Exported {len(output_files)} agents to {output_dir}")
+    except Exception as e:
+        logger.error(f"Error exporting agents: {str(e)}")
+        click.echo(f"Error exporting agents: {str(e)}", err=True)
+        sys.exit(1)
+
+
+@agents.command("import")
+@click.option(
+    "--file", "-f", required=True, type=click.Path(exists=True), help="Input file path"
+)
+@click.option(
+    "--use-existing-tools/--create-new-tools",
+    default=True,
+    help="Use existing tools with same name if found",
+)
+@click.option(
+    "--overwrite/--no-overwrite",
+    default=False,
+    help="Overwrite existing agent with same name",
+)
+@click.option(
+    "--ignore-missing-relationships/--strict-relationships",
+    default=True,
+    help="Ignore relationships to missing agents",
+)
+def import_agent_cmd(file, use_existing_tools, overwrite, ignore_missing_relationships):
+    """Import an agent from a file."""
+    try:
+        options = ImportOptions(
+            use_existing_tools=use_existing_tools,
+            overwrite_existing_agent=overwrite,
+            ignore_missing_relationships=ignore_missing_relationships,
+        )
+
+        agent_id = import_agent(file_path=file, options=options)
+        click.echo(f"Agent imported with ID: {agent_id}")
+    except Exception as e:
+        logger.error(f"Error importing agent: {str(e)}")
+        click.echo(f"Error importing agent: {str(e)}", err=True)
+        sys.exit(1)
+
+
+@agents.command("import-dir")
+@click.option(
+    "--directory",
+    "-d",
+    required=True,
+    type=click.Path(exists=True),
+    help="Directory containing agent files",
+)
+@click.option(
+    "--use-existing-tools/--create-new-tools",
+    default=True,
+    help="Use existing tools with same name if found",
+)
+@click.option(
+    "--overwrite/--no-overwrite",
+    default=False,
+    help="Overwrite existing agents with same name",
+)
+@click.option(
+    "--ignore-missing-relationships/--strict-relationships",
+    default=True,
+    help="Ignore relationships to missing agents",
+)
+def import_agents_from_directory_cmd(
+    directory, use_existing_tools, overwrite, ignore_missing_relationships
+):
+    """Import agents from files in a directory."""
+    try:
+        options = ImportOptions(
+            use_existing_tools=use_existing_tools,
+            overwrite_existing_agent=overwrite,
+            ignore_missing_relationships=ignore_missing_relationships,
+            defer_relationships=True,
+        )
+
+        agent_ids = import_agents_from_directory(
+            directory_path=directory, options=options
+        )
+        click.echo(f"Imported {len(agent_ids)} agents")
+    except Exception as e:
+        logger.error(f"Error importing agents: {str(e)}")
+        click.echo(f"Error importing agents: {str(e)}", err=True)
+        sys.exit(1)
+
+
 # Tool commands
 @cli.group()
 def tools():
     """Manage tools."""
     pass
+
 
 @tools.command("list")
 def list_tools():
@@ -128,15 +318,18 @@ def list_tools():
             if not tools:
                 click.echo("No tools found")
                 return
-            
+
             click.echo("ID | Name | Type | Module | Function")
             click.echo("-" * 60)
             for tool in tools:
-                click.echo(f"{tool.id} | {tool.name} | {tool.tool_type} | {tool.module_path} | {tool.function_name}")
+                click.echo(
+                    f"{tool.id} | {tool.name} | {tool.tool_type} | {tool.module_path} | {tool.function_name}"
+                )
     except Exception as e:
         logger.error(f"Error listing tools: {str(e)}")
         click.echo(f"Error listing tools: {str(e)}", err=True)
         sys.exit(1)
+
 
 @tools.command("create")
 @click.option("--name", required=True, help="Tool name")
@@ -144,7 +337,12 @@ def list_tools():
 @click.option("--type", "tool_type", required=True, help="Tool type")
 @click.option("--module", "module_path", required=True, help="Module path")
 @click.option("--function", "function_name", required=True, help="Function name")
-@click.option("--schema", "schema_file", type=click.Path(exists=True), help="Parameters schema JSON file")
+@click.option(
+    "--schema",
+    "schema_file",
+    type=click.Path(exists=True),
+    help="Parameters schema JSON file",
+)
 def create_tool(name, description, tool_type, module_path, function_name, schema_file):
     """Create a new tool."""
     try:
@@ -152,7 +350,7 @@ def create_tool(name, description, tool_type, module_path, function_name, schema
         if schema_file:
             with open(schema_file, "r") as f:
                 parameters_schema = json.load(f)
-        
+
         with get_db_session() as session:
             tool = Tool(
                 name=name,
@@ -160,7 +358,7 @@ def create_tool(name, description, tool_type, module_path, function_name, schema
                 tool_type=tool_type,
                 module_path=module_path,
                 function_name=function_name,
-                parameters_schema=parameters_schema
+                parameters_schema=parameters_schema,
             )
             session.add(tool)
             session.commit()
@@ -170,11 +368,13 @@ def create_tool(name, description, tool_type, module_path, function_name, schema
         click.echo(f"Error creating tool: {str(e)}", err=True)
         sys.exit(1)
 
+
 # Agent-Tool mapping commands
 @cli.group(name="agent-tools")
 def agent_tools():
     """Manage agent-tool mappings."""
     pass
+
 
 @agent_tools.command("assign")
 @click.option("--agent-id", required=True, type=int, help="Agent ID")
@@ -184,15 +384,16 @@ def assign_tool(agent_id, tool_id):
     try:
         with get_db_session() as session:
             # Check if mapping already exists
-            existing = session.query(AgentTool).filter(
-                AgentTool.agent_id == agent_id,
-                AgentTool.tool_id == tool_id
-            ).first()
-            
+            existing = (
+                session.query(AgentTool)
+                .filter(AgentTool.agent_id == agent_id, AgentTool.tool_id == tool_id)
+                .first()
+            )
+
             if existing:
                 click.echo("Tool is already assigned to this agent")
                 return
-            
+
             # Create mapping
             mapping = AgentTool(agent_id=agent_id, tool_id=tool_id)
             session.add(mapping)
@@ -203,27 +404,28 @@ def assign_tool(agent_id, tool_id):
         click.echo(f"Error assigning tool: {str(e)}", err=True)
         sys.exit(1)
 
+
 @agent_tools.command("list")
 @click.option("--agent-id", type=int, help="Filter by agent ID")
 def list_agent_tools(agent_id):
     """List agent-tool mappings."""
     try:
         with get_db_session() as session:
-            query = session.query(AgentTool, Agent, Tool).join(
-                Agent, AgentTool.agent_id == Agent.id
-            ).join(
-                Tool, AgentTool.tool_id == Tool.id
+            query = (
+                session.query(AgentTool, Agent, Tool)
+                .join(Agent, AgentTool.agent_id == Agent.id)
+                .join(Tool, AgentTool.tool_id == Tool.id)
             )
-            
+
             if agent_id:
                 query = query.filter(AgentTool.agent_id == agent_id)
-            
+
             mappings = query.all()
-            
+
             if not mappings:
                 click.echo("No mappings found")
                 return
-            
+
             click.echo("Agent ID | Agent Name | Tool ID | Tool Name")
             click.echo("-" * 60)
             for mapping, agent, tool in mappings:
@@ -233,11 +435,13 @@ def list_agent_tools(agent_id):
         click.echo(f"Error listing agent-tool mappings: {str(e)}", err=True)
         sys.exit(1)
 
+
 # Agent relationship commands
 @cli.group(name="relationships")
 def relationships():
     """Manage agent relationships."""
     pass
+
 
 @relationships.command("create")
 @click.option("--parent-id", required=True, type=int, help="Parent agent ID")
@@ -249,29 +453,36 @@ def create_relationship(parent_id, child_id, rel_type, order):
     try:
         with get_db_session() as session:
             # Check if relationship already exists
-            existing = session.query(AgentRelationship).filter(
-                AgentRelationship.parent_agent_id == parent_id,
-                AgentRelationship.child_agent_id == child_id
-            ).first()
-            
+            existing = (
+                session.query(AgentRelationship)
+                .filter(
+                    AgentRelationship.parent_agent_id == parent_id,
+                    AgentRelationship.child_agent_id == child_id,
+                )
+                .first()
+            )
+
             if existing:
                 click.echo("Relationship already exists")
                 return
-            
+
             # Create relationship
             relationship = AgentRelationship(
                 parent_agent_id=parent_id,
                 child_agent_id=child_id,
                 relationship_type=rel_type,
-                execution_order=order
+                execution_order=order,
             )
             session.add(relationship)
             session.commit()
-            click.echo(f"Created relationship: Parent {parent_id} -> Child {child_id} (Type: {rel_type}, Order: {order})")
+            click.echo(
+                f"Created relationship: Parent {parent_id} -> Child {child_id} (Type: {rel_type}, Order: {order})"
+            )
     except Exception as e:
         logger.error(f"Error creating relationship: {str(e)}")
         click.echo(f"Error creating relationship: {str(e)}", err=True)
         sys.exit(1)
+
 
 # Network commands
 @cli.group()
@@ -279,15 +490,22 @@ def networks():
     """Manage agent networks."""
     pass
 
+
 @networks.command("run")
 @click.argument("coordinator_id", type=int)
-@click.option("--input", "input_file", type=click.Path(exists=True), required=True, help="Input JSON file")
+@click.option(
+    "--input",
+    "input_file",
+    type=click.Path(exists=True),
+    required=True,
+    help="Input JSON file",
+)
 def run_network_cmd(coordinator_id, input_file):
     """Run an agent network with a coordinator."""
     try:
         with open(input_file, "r") as f:
             input_data = json.load(f)
-        
+
         with get_db_session() as session:
             result = run_agent_network(coordinator_id, input_data, session)
             click.echo(json.dumps(result, indent=2))
@@ -295,6 +513,7 @@ def run_network_cmd(coordinator_id, input_file):
         logger.error(f"Error running network: {str(e)}")
         click.echo(f"Error running network: {str(e)}", err=True)
         sys.exit(1)
+
 
 # Server command
 @cli.command("serve")
@@ -308,6 +527,7 @@ def serve(host, port):
         logger.error(f"Error starting server: {str(e)}")
         click.echo(f"Error starting server: {str(e)}", err=True)
         sys.exit(1)
+
 
 if __name__ == "__main__":
     cli()
