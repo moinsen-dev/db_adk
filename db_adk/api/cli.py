@@ -9,8 +9,6 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from ..core.agent_factory import create_agent_from_record
-from ..core.network_manager import run_agent_network
 from ..db.connection import clear_db, get_db_session, init_db
 from ..db.models import Agent, AgentRelationship, AgentTool, Tool
 from ..import_export import (
@@ -178,13 +176,7 @@ def create_agent(
     required=False,
     help="Direct query text (alternative to input file)",
 )
-@click.option(
-    "--use-v030",
-    is_flag=True,
-    default=False,
-    help="Force using v0.3.0 compatible runner",
-)
-def run_agent_cmd(agent_id, input_file, query, use_v030):
+def run_agent_cmd(agent_id, input_file, query):
     """Run an agent with given input, either from a file or direct query text."""
     # Check that we have either an input file or a direct query
     if not input_file and not query:
@@ -207,63 +199,20 @@ def run_agent_cmd(agent_id, input_file, query, use_v030):
 
     with get_db_session() as session:
         try:
-            # Detect if we should use the v0.3.0 compatible runner
-            adk_version = None
-            try:
-                import google.adk
+            # Always use the v0.3.0 runner for compatibility
+            from ..core.runner_v030 import run_agent_with_runner
 
-                adk_version = getattr(google.adk, "__version__", None)
-            except (ImportError, AttributeError):
-                pass
+            # Get agent name to display
+            agent_record = session.query(Agent).filter(Agent.id == agent_id).first()
+            agent_name = agent_record.name if agent_record else f"Agent {agent_id}"
 
-            # Use v0.3.0 runner if explicitly requested or if ADK version is 0.3.0 or higher
-            use_v030_runner = use_v030 or (
-                adk_version is not None
-                and isinstance(adk_version, str)
-                and adk_version >= "0.3.0"
+            console.print(
+                f"Running agent [bold cyan]{agent_name}[/] with query...",
+                style="green",
             )
 
-            if use_v030_runner:
-                # Import here to avoid circular imports
-                from ..core.runner_v030 import run_agent_with_runner
-
-                console.print(
-                    f"Using v0.3.0 compatible runner for ADK version: {adk_version or 'unknown'}",
-                    style="yellow",
-                )
-
-                # Get agent name to display
-                agent_record = session.query(Agent).filter(Agent.id == agent_id).first()
-                agent_name = agent_record.name if agent_record else f"Agent {agent_id}"
-
-                console.print(
-                    f"Running agent [bold cyan]{agent_name}[/] with query...",
-                    style="green",
-                )
-
-                # Run using v0.3.0 runner
-                result = run_agent_with_runner(agent_id, input_data, session)
-            else:
-                # Create the agent using the traditional method
-                agent = create_agent_from_record(agent_id, session)
-
-                console.print(
-                    f"Running agent [bold cyan]{agent.name}[/] with query...",
-                    style="green",
-                )
-
-                # Use run_async with a simple string input for ADK compatibility
-                import asyncio
-
-                async def collect_results():
-                    result = []
-                    async for resp in agent.run_async(input_data):
-                        if resp:
-                            result.append(resp)
-                    return result[-1] if result else "No response from agent"
-
-                # Run the async generator and collect the results
-                result = asyncio.run(collect_results())
+            # Run using v0.3.0 runner
+            result = run_agent_with_runner(agent_id, input_data, session)
 
             # Format the output nicely with Rich
             if isinstance(result, dict):
@@ -686,13 +635,7 @@ def networks():
     required=False,
     help="Direct query text (alternative to input file)",
 )
-@click.option(
-    "--use-v030",
-    is_flag=True,
-    default=False,
-    help="Force using v0.3.0 compatible runner",
-)
-def run_network_cmd(coordinator_id, input_file, query, use_v030):
+def run_network_cmd(coordinator_id, input_file, query):
     """Run an agent network with a coordinator, either from a file or direct query text."""
     try:
         if not input_file and not query:
@@ -717,21 +660,8 @@ def run_network_cmd(coordinator_id, input_file, query, use_v030):
 
         with get_db_session() as session:
             try:
-                # Detect if we should use the v0.3.0 compatible runner
-                adk_version = None
-                try:
-                    import google.adk
-
-                    adk_version = getattr(google.adk, "__version__", None)
-                except (ImportError, AttributeError):
-                    pass
-
-                # Use v0.3.0 runner if explicitly requested or if ADK version is 0.3.0 or higher
-                use_v030_runner = use_v030 or (
-                    adk_version is not None
-                    and isinstance(adk_version, str)
-                    and adk_version >= "0.3.0"
-                )
+                # Always use the v0.3.0 runner
+                from ..core.runner_v030 import run_network_with_runner
 
                 # Get agent name to display
                 agent_record = (
@@ -748,22 +678,8 @@ def run_network_cmd(coordinator_id, input_file, query, use_v030):
                     style="green",
                 )
 
-                if use_v030_runner:
-                    # Import here to avoid circular imports
-                    from ..core.runner_v030 import run_network_with_runner
-
-                    console.print(
-                        f"Using v0.3.0 compatible runner for ADK version: {adk_version or 'unknown'}",
-                        style="yellow",
-                    )
-
-                    # Run using v0.3.0 runner
-                    result = run_network_with_runner(
-                        coordinator_id, input_data, session
-                    )
-                else:
-                    # Use the traditional runner
-                    result = run_agent_network(coordinator_id, input_data, session)
+                # Run using v0.3.0 runner
+                result = run_network_with_runner(coordinator_id, input_data, session)
 
                 # Format the output nicely with Rich
                 if isinstance(result, dict):

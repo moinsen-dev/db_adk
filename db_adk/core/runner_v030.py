@@ -6,6 +6,7 @@ runner functionality that matches the new API requirements.
 """
 
 import json
+import os
 from typing import Any, Dict, Union
 
 from google.adk.runners import Runner
@@ -17,6 +18,28 @@ from .agent_factory import create_agent_from_record
 
 # Initialize logger
 logger = get_logger(__name__)
+
+
+def setup_api_credentials():
+    """Setup Google AI API credentials from environment variables or dotenv."""
+    api_key = os.environ.get("GOOGLE_API_KEY")
+    if not api_key:
+        # Try loading from .env file if python-dotenv is available
+        try:
+            from dotenv import load_dotenv
+
+            load_dotenv()
+            api_key = os.environ.get("GOOGLE_API_KEY")
+        except ImportError:
+            logger.warning("python-dotenv not installed, cannot load from .env file")
+
+    if not api_key:
+        logger.warning("GOOGLE_API_KEY environment variable not set")
+        return False
+
+    # No need to call configure - the Client will use API_KEY from env
+    logger.info("Google AI API credentials found in environment")
+    return True
 
 
 def setup_runner(
@@ -33,6 +56,9 @@ def setup_runner(
     Returns:
         tuple: (runner, session_service) containing the configured Runner and SessionService
     """
+    # Setup API credentials first - ensure API_KEY exists
+    setup_api_credentials()
+
     # Create session service and initialize session
     session_service = InMemorySessionService()
     session = session_service.create_session(
@@ -86,6 +112,11 @@ def run_agent_with_runner(
     Returns:
         str: Agent response
     """
+    # Setup API credentials first
+    credential_setup = setup_api_credentials()
+    if not credential_setup:
+        return "Error: Google API credentials not configured. Please set GOOGLE_API_KEY environment variable."
+
     # Create agent from database record
     agent = create_agent_from_record(agent_id, db_session)
 
