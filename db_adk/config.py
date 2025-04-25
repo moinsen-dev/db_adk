@@ -10,13 +10,15 @@ load_dotenv()
 
 def get_db_url():
     """Get the database URL from environment variables."""
-    host = os.getenv("DB_HOST", "localhost")
-    port = os.getenv("DB_PORT", "5432")
-    user = os.getenv("DB_USER", "postgres")
-    password = os.getenv("DB_PASSWORD", "")
-    database = os.getenv("DB_NAME", "db_adk")
-    
-    return f"postgresql://{user}:{password}@{host}:{port}/{database}"
+    # Use SQLite instead of PostgreSQL
+    db_path = os.getenv("DB_PATH", "db_adk.sqlite")
+
+    # Ensure the directory exists
+    db_dir = os.path.dirname(db_path)
+    if db_dir and not os.path.exists(db_dir):
+        os.makedirs(db_dir)
+
+    return f"sqlite:///{db_path}"
 
 def get_adk_api_key():
     """Get the ADK API key from environment variables."""

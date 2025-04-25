@@ -1,10 +1,10 @@
 # DB-ADK: Database-Driven Agent Development Kit
 
-DB-ADK is a Python package that extends Google's Agent Development Kit (ADK) to create a fully database-driven approach for building and managing agent networks. This approach minimizes explicit Python coding by storing agent configurations, prompts, and tool definitions in a PostgreSQL database.
+DB-ADK is a Python package that extends Google's Agent Development Kit (ADK) to create a fully database-driven approach for building and managing agent networks. This approach minimizes explicit Python coding by storing agent configurations, prompts, and tool definitions in a SQLite database.
 
 ## Key Features
 
-- **Database-Driven**: Store all agent and tool configurations in PostgreSQL
+- **Database-Driven**: Store all agent and tool configurations in SQLite
 - **Minimal Python Coding**: Define new agents and tools through the database or API without writing new code
 - **Dynamic Loading**: Automatically load tools and create agents from database records
 - **Agent Networks**: Build complex multi-agent systems with different relationship types
@@ -12,6 +12,19 @@ DB-ADK is a Python package that extends Google's Agent Development Kit (ADK) to 
 - **Extensible**: Easily add new tools and agent types
 
 ## Installation
+
+### Using uv (Recommended)
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/db-adk.git
+cd db-adk
+
+# Install using uv
+uv install -e .
+```
+
+### Using pip
 
 ```bash
 # Clone the repository
@@ -25,21 +38,18 @@ pip install -e .
 ## Requirements
 
 - Python 3.9+
-- PostgreSQL database
+- SQLite (built into Python)
 - Google ADK (`google-adk`)
 
 ## Quick Start
 
 ### 1. Set up environment variables
 
-Create a `.env` file with your database and ADK configuration:
+Create a `.env` file with your ADK configuration:
 
 ```
-DB_HOST=localhost
-DB_PORT=5432
-DB_USER=postgres
-DB_PASSWORD=your_password
-DB_NAME=db_adk
+# SQLite database path (default: db_adk.sqlite in the current directory)
+DB_PATH=db_adk.sqlite
 ADK_API_KEY=your_api_key
 DEFAULT_MODEL=gemini-1.5-pro
 ```
