@@ -1,0 +1,47 @@
+{
+  "schema_version": "1.0",
+  "export_date": "2023-08-01T10:00:00Z",
+  "agent": {
+    "name": "research_assistant",
+    "description": "An intelligent research assistant that helps find, summarize, and analyze information on any topic.",
+    "agent_type": "LlmAgent",
+    "prompt_template": "You are a research assistant specialized in finding, analyzing, and summarizing information. When asked about a topic, provide thorough and accurate information. Break down complex topics, cite sources when possible, and organize your response in a clear structure. If you don't know something, acknowledge it rather than providing incorrect information.",
+    "model_name": "gemini-1.5-pro",
+    "configuration": {
+      "temperature": 0.2,
+      "max_tokens": 2048
+    }
+  },
+  "tools": [
+    {
+      "name": "search_web",
+      "description": "Search the web for information",
+      "tool_type": "python_function",
+      "module_path": "tools.research",
+      "function_name": "search_web",
+      "parameters_schema": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string" },
+          "num_results": { "type": "integer", "default": 5 }
+        },
+        "required": ["query"]
+      }
+    },
+    {
+      "name": "summarize_text",
+      "description": "Generate a concise summary of provided text",
+      "tool_type": "python_function",
+      "module_path": "tools.research",
+      "function_name": "summarize_text",
+      "parameters_schema": {
+        "type": "object",
+        "properties": {
+          "text": { "type": "string" },
+          "max_length": { "type": "integer", "default": 200 }
+        },
+        "required": ["text"]
+      }
+    }
+  ]
+}

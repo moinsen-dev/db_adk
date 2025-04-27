@@ -1,0 +1,65 @@
+{
+  "schema_version": "1.0",
+  "export_date": "2023-08-01T10:00:00Z",
+  "agent": {
+    "name": "customer_support",
+    "description": "Customer support agent that handles product inquiries, troubleshooting, and general assistance.",
+    "agent_type": "Agent",
+    "prompt_template": "You are a professional customer support agent for a technology company. Handle customer inquiries with courtesy and expertise. You can access product information, troubleshoot common issues, and escalate complex problems when necessary. Maintain a friendly and helpful tone throughout all interactions.",
+    "model_name": "gemini-1.5-pro",
+    "configuration": {
+      "temperature": 0.3,
+      "top_p": 0.95
+    }
+  },
+  "tools": [
+    {
+      "name": "lookup_product",
+      "description": "Look up product information from the catalog",
+      "tool_type": "python_function",
+      "module_path": "tools.customer_support",
+      "function_name": "lookup_product",
+      "parameters_schema": {
+        "type": "object",
+        "properties": {
+          "product_id": { "type": "string" },
+          "product_name": { "type": "string" }
+        }
+      }
+    },
+    {
+      "name": "check_order_status",
+      "description": "Check the status of a customer order",
+      "tool_type": "python_function",
+      "module_path": "tools.customer_support",
+      "function_name": "check_order_status",
+      "parameters_schema": {
+        "type": "object",
+        "properties": {
+          "order_id": { "type": "string" },
+          "customer_email": { "type": "string" }
+        },
+        "required": ["order_id"]
+      }
+    },
+    {
+      "name": "create_support_ticket",
+      "description": "Create a support ticket for escalation",
+      "tool_type": "python_function",
+      "module_path": "tools.customer_support",
+      "function_name": "create_support_ticket",
+      "parameters_schema": {
+        "type": "object",
+        "properties": {
+          "customer_email": { "type": "string" },
+          "issue_description": { "type": "string" },
+          "priority": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "critical"]
+          }
+        },
+        "required": ["customer_email", "issue_description"]
+      }
+    }
+  ]
+}

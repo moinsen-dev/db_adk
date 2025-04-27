@@ -1,0 +1,91 @@
+{
+  "schema_version": "1.0",
+  "export_date": "2023-08-01T10:00:00Z",
+  "agent": {
+    "name": "custom_database_agent",
+    "description": "A custom agent specialized in database operations with direct database connection capabilities.",
+    "agent_type": "BaseAgent",
+    "prompt_template": "You are a database operations specialist with direct access to database systems. Handle data queries, schema management, and database maintenance tasks with precision and security awareness.",
+    "model_name": "gemini-1.5-pro",
+    "configuration": {
+      "database_connection": {
+        "type": "postgresql",
+        "connection_timeout": 30,
+        "query_timeout": 60
+      },
+      "custom_handler_class": "DatabaseOperationHandler"
+    }
+  },
+  "tools": [
+    {
+      "name": "execute_query",
+      "description": "Execute a SQL query on the connected database",
+      "tool_type": "python_function",
+      "module_path": "tools.database",
+      "function_name": "execute_query",
+      "parameters_schema": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string" },
+          "parameters": { "type": "object" },
+          "fetch_mode": { "type": "string", "enum": ["one", "all", "many"] }
+        },
+        "required": ["query"]
+      }
+    },
+    {
+      "name": "backup_database",
+      "description": "Create a backup of the database",
+      "tool_type": "python_function",
+      "module_path": "tools.database",
+      "function_name": "backup_database",
+      "parameters_schema": {
+        "type": "object",
+        "properties": {
+          "output_path": { "type": "string" },
+          "compression": { "type": "boolean", "default": true }
+        },
+        "required": ["output_path"]
+      }
+    },
+    {
+      "name": "analyze_query_performance",
+      "description": "Analyze the performance of a SQL query",
+      "tool_type": "python_function",
+      "module_path": "tools.database",
+      "function_name": "analyze_query_performance",
+      "parameters_schema": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string" },
+          "explain_type": {
+            "type": "string",
+            "enum": ["simple", "analyze", "verbose"],
+            "default": "analyze"
+          }
+        },
+        "required": ["query"]
+      }
+    },
+    {
+      "name": "manage_schema",
+      "description": "Manage database schema (create, alter, drop tables, etc.)",
+      "tool_type": "python_function",
+      "module_path": "tools.database",
+      "function_name": "manage_schema",
+      "parameters_schema": {
+        "type": "object",
+        "properties": {
+          "schema_ddl": { "type": "string" },
+          "dry_run": { "type": "boolean", "default": true }
+        },
+        "required": ["schema_ddl"]
+      }
+    }
+  ],
+  "implementation_notes": {
+    "custom_logic": "This agent extends BaseAgent directly to implement custom database connection handling, query execution safety checks, and performance monitoring. It manages its own connection pool and implements specialized error handling for database operations.",
+    "security_considerations": "This agent includes authorization checks before executing schema changes or data modification queries. It also implements query sanitization to prevent SQL injection.",
+    "extension_points": "The agent can be further customized by implementing additional database operation methods in the DatabaseOperationHandler class."
+  }
+}

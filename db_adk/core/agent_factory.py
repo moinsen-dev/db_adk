@@ -1,5 +1,26 @@
 """
 Factory for creating ADK agents from database records.
+
+In the Agent Development Kit (ADK), an 'Agent' is a self-contained execution unit
+designed to act autonomously to achieve specific goals. Agents can perform tasks,
+interact with users, utilize external tools, and coordinate with other agents.
+
+Core Agent Categories:
+1. LLM Agents (LlmAgent, Agent): These agents utilize Large Language Models as their
+   core engine to understand natural language, reason, plan, generate responses, and
+   dynamically decide how to proceed or which tools to use.
+
+2. Workflow Agents (SequentialAgent, ParallelAgent, LoopAgent): These specialized
+   agents control the execution flow of other agents in predefined, deterministic
+   patterns without using an LLM for the flow control itself.
+
+3. Custom Agents: Created by extending BaseAgent directly, these agents allow you
+   to implement unique operational logic, specific control flows, or specialized
+   integrations not covered by the standard types.
+
+The true power often comes from combining them in multi-agent systems where LLM agents
+handle intelligent tasks, workflow agents manage process flow, and custom agents provide
+specialized capabilities.
 """
 
 import json
@@ -16,7 +37,14 @@ def get_agent_class(agent_type):
     """Get the ADK agent class based on agent type.
 
     Args:
-        agent_type (str): The type of agent (e.g., 'LLM', 'Coordinator', 'Sequential').
+        agent_type (str): The type of agent to create. Supported types:
+            - 'LlmAgent': Language model agent that utilizes LLMs to understand natural language,
+              reason, plan, and dynamically decide how to proceed or which tools to use.
+            - 'Agent': Alternative LLM agent class with similar capabilities.
+            - 'SequentialAgent': Workflow agent that executes sub-agents in a predefined sequence.
+            - 'ParallelAgent': Workflow agent that executes multiple sub-agents concurrently.
+            - 'LoopAgent': Workflow agent that repeatedly executes a sub-agent based on a condition.
+            - 'BaseAgent': Base class for creating custom agents with unique operational logic.
 
     Returns:
         class: The agent class.
@@ -30,12 +58,12 @@ def get_agent_class(agent_type):
 
         # Map agent types to ADK agent classes
         agent_classes = {
-            "LLM": adk_agents.LlmAgent,
-            # Note: CoordinatorAgent is not available in Google ADK
-            # For 'Coordinator' type, we'll use LlmAgent with sub_agents
-            "Coordinator": adk_agents.LlmAgent,  # Using LlmAgent instead of non-existent CoordinatorAgent
-            "Sequential": adk_agents.SequentialAgent,
-            "Parallel": adk_agents.ParallelAgent,
+            "LlmAgent": adk_agents.LlmAgent,  # Using LlmAgent instead of non-existent CoordinatorAgent
+            "SequentialAgent": adk_agents.SequentialAgent,
+            "ParallelAgent": adk_agents.ParallelAgent,
+            "LoopAgent": adk_agents.LoopAgent,
+            "Agent": adk_agents.Agent,
+            "BaseAgent": adk_agents.BaseAgent,
         }
 
         if agent_type not in agent_classes:

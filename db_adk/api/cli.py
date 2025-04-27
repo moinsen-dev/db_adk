@@ -310,17 +310,34 @@ def run_agent_cmd(agent_id, input_file, query, chat):
 
         # Get database session
         with get_db_session() as session:
-            # Create agent and run it
-            result = run_agent_with_runner(agent_id, input_data, session)
+            # Get agent information for better user feedback
+            agent_record = session.query(Agent).filter(Agent.id == agent_id).first()
+            if not agent_record:
+                console.print(f"[bold red]Error: Agent with ID {agent_id} not found[/]")
+                sys.exit(1)
+
+            console.print(f"[bold]Running agent: [cyan]{agent_record.name}[/cyan][/]")
+            console.print(f"[dim]Agent type: {agent_record.agent_type}[/]")
+
+            console.print("\n[bold yellow]Processing request...[/]")
+
+            # Show a spinner while processing
+            with console.status(
+                "[bold green]Agent working on your request...[/]", spinner="dots"
+            ):
+                # Create agent and run it
+                result = run_agent_with_runner(agent_id, input_data, session)
 
             # Check if result is a string (direct response) or events object
             if isinstance(result, str):
                 # Direct response already provided
+                console.print("\n[bold cyan]Response from agent:[/]")
                 console.print(result)
             else:
                 # Process events to extract responses
                 responses = extract_response_from_events(result)
                 response = responses[0] if responses else "No response from agent"
+                console.print("\n[bold cyan]Response from agent:[/]")
                 console.print(response)
 
     except ImportError as e:
@@ -883,11 +900,59 @@ def run_network_cmd(coordinator_id, input_file, query, chat):
         # Run the network
         try:
             with get_db_session() as session:
-                result = run_network_with_runner(coordinator_id, input_data, session)
+                # Get network information first for better user feedback
+                from ..db.models import Agent, AgentRelationship
+
+                coordinator = (
+                    session.query(Agent).filter(Agent.id == coordinator_id).first()
+                )
+                if not coordinator:
+                    console.print(
+                        f"[bold red]Error: Coordinator agent with ID {coordinator_id} not found[/]"
+                    )
+                    sys.exit(1)
+
+                # Find all child agents
+                relationships = (
+                    session.query(AgentRelationship)
+                    .filter(AgentRelationship.parent_agent_id == coordinator_id)
+                    .all()
+                )
+
+                child_agent_ids = [rel.child_agent_id for rel in relationships]
+                child_agents = []
+                if child_agent_ids:
+                    child_agents = (
+                        session.query(Agent).filter(Agent.id.in_(child_agent_ids)).all()
+                    )
+
+                # Show network information to user
+                console.print(
+                    f"[bold]Running agent network with coordinator: [cyan]{coordinator.name}[/cyan][/]"
+                )
+                if child_agents:
+                    console.print(
+                        f"[bold]Network includes {len(child_agents)} sub-agents:[/]"
+                    )
+                    for agent in child_agents:
+                        console.print(
+                            f"  - [magenta]{agent.name}[/] ([dim]ID: {agent.id}[/])"
+                        )
+
+                console.print("\n[bold yellow]Processing request...[/]")
+
+                # Show a spinner while processing
+                with console.status(
+                    "[bold green]Agents working on your request...[/]", spinner="dots"
+                ):
+                    result = run_network_with_runner(
+                        coordinator_id, input_data, session
+                    )
 
                 # Check if result is a string (direct response) or events object
                 if isinstance(result, str):
                     # Direct response already provided
+                    console.print("\n[bold cyan]Response from network:[/]")
                     console.print(result)
                 else:
                     # Process events to extract responses
@@ -895,6 +960,7 @@ def run_network_cmd(coordinator_id, input_file, query, chat):
                     response = (
                         responses[0] if responses else "No response from agent network"
                     )
+                    console.print("\n[bold cyan]Response from network:[/]")
                     console.print(response)
 
         except ImportError as e:

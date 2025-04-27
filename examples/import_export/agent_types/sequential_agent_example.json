@@ -1,0 +1,88 @@
+{
+  "schema_version": "1.0",
+  "export_date": "2023-08-01T10:00:00Z",
+  "agent": {
+    "name": "content_production_pipeline",
+    "description": "A sequential workflow agent that manages the content creation process from research to publishing.",
+    "agent_type": "SequentialAgent",
+    "prompt_template": "You are a content production pipeline coordinator. Your role is to manage the flow of content from research to publishing by coordinating various specialized agents in a predefined sequence.",
+    "model_name": null,
+    "configuration": {}
+  },
+  "relationships": [
+    {
+      "child_agent_name": "topic_researcher",
+      "relationship_type": "sequential",
+      "execution_order": 1
+    },
+    {
+      "child_agent_name": "content_outliner",
+      "relationship_type": "sequential",
+      "execution_order": 2
+    },
+    {
+      "child_agent_name": "content_writer",
+      "relationship_type": "sequential",
+      "execution_order": 3
+    },
+    {
+      "child_agent_name": "content_editor",
+      "relationship_type": "sequential",
+      "execution_order": 4
+    },
+    {
+      "child_agent_name": "seo_optimizer",
+      "relationship_type": "sequential",
+      "execution_order": 5
+    },
+    {
+      "child_agent_name": "content_publisher",
+      "relationship_type": "sequential",
+      "execution_order": 6
+    }
+  ],
+  "sub_agents": [
+    {
+      "name": "topic_researcher",
+      "description": "Researches topics and gathers relevant information and data.",
+      "agent_type": "LlmAgent",
+      "prompt_template": "You are a thorough researcher. Gather comprehensive information on assigned topics using reliable sources. Organize findings to provide a solid foundation for content creation.",
+      "model_name": "gemini-1.5-pro"
+    },
+    {
+      "name": "content_outliner",
+      "description": "Creates structured outlines for content based on research.",
+      "agent_type": "LlmAgent",
+      "prompt_template": "You are a content outliner. Based on research provided, create structured outlines that logically organize information and establish a clear content flow.",
+      "model_name": "gemini-1.5-pro"
+    },
+    {
+      "name": "content_writer",
+      "description": "Writes content based on outlines.",
+      "agent_type": "LlmAgent",
+      "prompt_template": "You are a content writer. Create engaging and informative content following the provided outline. Maintain a consistent tone and style while effectively communicating key points.",
+      "model_name": "gemini-1.5-pro"
+    },
+    {
+      "name": "content_editor",
+      "description": "Edits and improves content for clarity and quality.",
+      "agent_type": "LlmAgent",
+      "prompt_template": "You are a content editor. Review and improve written content for clarity, coherence, grammar, and style. Ensure the content effectively communicates its intended message.",
+      "model_name": "gemini-1.5-pro"
+    },
+    {
+      "name": "seo_optimizer",
+      "description": "Optimizes content for search engines.",
+      "agent_type": "LlmAgent",
+      "prompt_template": "You are an SEO specialist. Optimize content for search engines by suggesting keyword improvements, metadata, and structural changes without compromising reader experience.",
+      "model_name": "gemini-1.5-pro"
+    },
+    {
+      "name": "content_publisher",
+      "description": "Prepares and publishes content to appropriate platforms.",
+      "agent_type": "LlmAgent",
+      "prompt_template": "You are a content publishing specialist. Format content appropriately for digital platforms, add necessary tags and categories, and ensure proper integration with content management systems.",
+      "model_name": "gemini-1.5-pro"
+    }
+  ]
+}

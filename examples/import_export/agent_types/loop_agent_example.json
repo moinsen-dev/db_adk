@@ -1,0 +1,61 @@
+{
+  "schema_version": "1.0",
+  "export_date": "2023-08-01T10:00:00Z",
+  "agent": {
+    "name": "iterative_code_optimizer",
+    "description": "A loop workflow agent that repeatedly improves code quality until it meets performance and quality standards.",
+    "agent_type": "LoopAgent",
+    "prompt_template": "You are an iterative code optimization system. Your role is to coordinate the repeated improvement of code until it meets defined quality and performance standards.",
+    "model_name": null,
+    "configuration": {
+      "max_iterations": 5,
+      "loop_condition": "performance_threshold_not_met && iteration_count < max_iterations"
+    }
+  },
+  "relationships": [
+    {
+      "child_agent_name": "code_analyzer",
+      "relationship_type": "loop",
+      "execution_order": 1
+    }
+  ],
+  "sub_agents": [
+    {
+      "name": "code_analyzer",
+      "description": "Analyzes code for inefficiencies, bugs, and style issues, then proposes optimizations.",
+      "agent_type": "SequentialAgent",
+      "prompt_template": "You are a code analysis and optimization system. Analyze the provided code for performance issues, bugs, and style inconsistencies, then implement improvements while maintaining functionality.",
+      "model_name": null,
+      "sub_agents": [
+        {
+          "name": "static_analyzer",
+          "description": "Performs static code analysis to identify potential issues.",
+          "agent_type": "LlmAgent",
+          "prompt_template": "You are a static code analyzer. Examine code without executing it to identify potential bugs, style violations, security vulnerabilities, and architectural issues.",
+          "model_name": "gemini-1.5-pro"
+        },
+        {
+          "name": "performance_tester",
+          "description": "Tests code performance and identifies bottlenecks.",
+          "agent_type": "LlmAgent",
+          "prompt_template": "You are a performance testing specialist. Evaluate code execution time, memory usage, and resource consumption. Identify performance bottlenecks and inefficient algorithms.",
+          "model_name": "gemini-1.5-pro"
+        },
+        {
+          "name": "code_refactorer",
+          "description": "Refactors code to improve quality and efficiency.",
+          "agent_type": "LlmAgent",
+          "prompt_template": "You are a code refactoring expert. Restructure existing code to improve readability, maintainability, and performance without changing its external behavior.",
+          "model_name": "gemini-1.5-pro"
+        },
+        {
+          "name": "test_validator",
+          "description": "Validates code changes against test cases.",
+          "agent_type": "LlmAgent",
+          "prompt_template": "You are a test validation specialist. Verify that refactored code continues to pass all test cases and maintains functional equivalence with the original code.",
+          "model_name": "gemini-1.5-pro"
+        }
+      ]
+    }
+  ]
+}

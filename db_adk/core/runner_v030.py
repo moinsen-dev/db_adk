@@ -119,6 +119,7 @@ def run_agent_with_runner(
     db_session,
     user_id: str = "user123",
     session_id: str = "session123",
+    verbose: bool = True,
 ):
     """Run an agent using the v0.3.0 Runner API.
 
@@ -128,6 +129,7 @@ def run_agent_with_runner(
         db_session: Database session
         user_id: User identifier (default: 'user123')
         session_id: Session identifier (default: 'session123')
+        verbose: Whether to log detailed progress information (default: True)
 
     Returns:
         str: Agent response
@@ -143,6 +145,15 @@ def run_agent_with_runner(
     # Create agent from database record
     agent = create_agent_from_record(agent_id, db_session)
 
+    # Check if this is a coordinator agent with sub-agents
+    is_coordinator = hasattr(agent, "sub_agents") and agent.sub_agents
+    sub_agent_names = []
+    if is_coordinator and verbose:
+        sub_agent_names = [sub_agent.name for sub_agent in agent.sub_agents]
+        logger.info(
+            f"Coordinator agent {agent.name} has {len(agent.sub_agents)} sub-agents: {', '.join(sub_agent_names)}"
+        )
+
     # Set up runner
     runner, _ = setup_runner(agent, user_id, session_id)
 
@@ -151,11 +162,54 @@ def run_agent_with_runner(
 
     logger.info(f"Running agent {agent.name} with v0.3.0 runner")
 
+    # For tracking sub-agent activities
+    active_agents = set()
+    last_agent = None
+
     # Run the agent using the runner
     events = runner.run(user_id=user_id, session_id=session_id, new_message=content)
 
-    # Extract responses using the utility function
-    responses = extract_response_from_events(events)
+    # Process events to extract responses and track sub-agent activities
+    responses = []
+
+    # Check if the iterator is actually returning events
+    if hasattr(events, "__iter__"):
+        for event in events:
+            # Extract agent activity information if available
+            if hasattr(event, "agent_name") and event.agent_name:
+                if event.agent_name != last_agent:
+                    if verbose:
+                        logger.info(f"Sub-agent active: {event.agent_name}")
+                    active_agents.add(event.agent_name)
+                    last_agent = event.agent_name
+
+            # Process final responses
+            if (
+                hasattr(event, "is_final_response")
+                and event.is_final_response()
+                and event.content is not None
+            ):
+                if hasattr(event.content, "parts") and event.content.parts:
+                    for part in event.content.parts:
+                        if hasattr(part, "text") and part.text:
+                            responses.append(part.text)
+
+    # Log which sub-agents were involved
+    if is_coordinator and verbose:
+        if active_agents:
+            logger.info(
+                f"Sub-agents involved in processing: {', '.join(active_agents)}"
+            )
+            # Check if any sub-agents were not used
+            unused_agents = set(sub_agent_names) - active_agents
+            if unused_agents:
+                logger.warning(
+                    f"Sub-agents not involved in processing: {', '.join(unused_agents)}"
+                )
+        else:
+            logger.warning(
+                f"No sub-agent activity detected from coordinator {agent.name}"
+            )
 
     logger.info("Agent execution completed")
 
@@ -168,6 +222,7 @@ def run_network_with_runner(
     db_session,
     user_id: str = "user123",
     session_id: str = "session123",
+    verbose: bool = True,
 ):
     """Run an agent network using the v0.3.0 Runner API.
 
@@ -177,6 +232,7 @@ def run_network_with_runner(
         db_session: Database session
         user_id: User identifier (default: 'user123')
         session_id: Session identifier (default: 'session123')
+        verbose: Whether to log detailed progress information (default: True)
 
     Returns:
         str: Network response
@@ -189,4 +245,5 @@ def run_network_with_runner(
         db_session=db_session,
         user_id=user_id,
         session_id=session_id,
+        verbose=verbose,
     )

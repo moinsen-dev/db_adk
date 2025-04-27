@@ -1,0 +1,78 @@
+{
+  "schema_version": "1.0",
+  "export_date": "2023-08-01T10:00:00Z",
+  "agent": {
+    "name": "data_analytics_system",
+    "description": "A parallel workflow agent that executes multiple data analysis tasks concurrently for efficient processing.",
+    "agent_type": "ParallelAgent",
+    "prompt_template": "You are a data analytics system coordinator. Your role is to manage the parallel execution of various data processing and analysis tasks to maximize efficiency and provide comprehensive insights.",
+    "model_name": null,
+    "configuration": {
+      "timeout_seconds": 300
+    }
+  },
+  "relationships": [
+    {
+      "child_agent_name": "data_cleaner",
+      "relationship_type": "parallel",
+      "execution_order": 1
+    },
+    {
+      "child_agent_name": "statistical_analyzer",
+      "relationship_type": "parallel",
+      "execution_order": 1
+    },
+    {
+      "child_agent_name": "trend_detector",
+      "relationship_type": "parallel",
+      "execution_order": 1
+    },
+    {
+      "child_agent_name": "data_visualizer",
+      "relationship_type": "parallel",
+      "execution_order": 1
+    },
+    {
+      "child_agent_name": "insight_generator",
+      "relationship_type": "parallel",
+      "execution_order": 1
+    }
+  ],
+  "sub_agents": [
+    {
+      "name": "data_cleaner",
+      "description": "Preprocesses and cleans raw data for analysis.",
+      "agent_type": "LlmAgent",
+      "prompt_template": "You are a data cleaning specialist. Identify and handle missing values, outliers, and inconsistencies in datasets. Apply appropriate normalization and transformation techniques to prepare data for analysis.",
+      "model_name": "gemini-1.5-pro"
+    },
+    {
+      "name": "statistical_analyzer",
+      "description": "Performs statistical analysis on cleaned data.",
+      "agent_type": "LlmAgent",
+      "prompt_template": "You are a statistical analysis expert. Apply descriptive and inferential statistics to analyze datasets. Identify key statistical measures, perform hypothesis testing, and evaluate statistical significance of findings.",
+      "model_name": "gemini-1.5-pro"
+    },
+    {
+      "name": "trend_detector",
+      "description": "Identifies trends and patterns in data.",
+      "agent_type": "LlmAgent",
+      "prompt_template": "You are a trend analysis specialist. Identify temporal patterns, correlations, and anomalies in data. Detect emerging trends and forecast potential future developments based on historical patterns.",
+      "model_name": "gemini-1.5-pro"
+    },
+    {
+      "name": "data_visualizer",
+      "description": "Creates visual representations of data and analysis results.",
+      "agent_type": "LlmAgent",
+      "prompt_template": "You are a data visualization expert. Create clear, informative, and visually appealing graphical representations of data. Select appropriate chart types and design elements to effectively communicate insights.",
+      "model_name": "gemini-1.5-pro"
+    },
+    {
+      "name": "insight_generator",
+      "description": "Generates meaningful business insights from analysis results.",
+      "agent_type": "LlmAgent",
+      "prompt_template": "You are a business insights specialist. Translate analytical findings into actionable business insights. Identify implications for strategy, operations, and decision-making based on data analysis results.",
+      "model_name": "gemini-1.5-pro"
+    }
+  ]
+}
